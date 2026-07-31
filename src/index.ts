@@ -938,8 +938,10 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
     .createObject({
       title: `${i18n('modalTitle')}: ${title}`,
       content: h('div', { class: 'ipe-quick-cat ipe-quick-cat--loading' }, i18n('loading')),
-      // compact-buttons：与 quick-move / quick-redirect 一致的紧凑按钮样式
-      className: 'ipe-quick-cat compact-buttons',
+      // compact-buttons：与 quick-move / quick-redirect 一致的紧凑按钮样式；
+      // 注意 className 会作用在弹窗窗口上，因此只保留 compact-buttons，
+      // 插件内容样式由内容根节点 .ipe-quick-cat 自行负责。
+      className: 'compact-buttons',
       sizeClass: 'smallToMedium',
       center: true,
       outSideClose: false,
