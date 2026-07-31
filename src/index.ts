@@ -399,36 +399,33 @@ function attachAutocomplete(
   suggest: HTMLElement,
   handlers: AutocompleteHandlers = {}
 ): { hideSuggest: () => void } {
+  // 下拉挂到 body 用 fixed 定位，避免被可滚动的分类列表（overflow-y:auto）裁剪
   const hideSuggest = () => {
+    suggest.remove()
     suggest.textContent = ''
-  }
-
-  // 智能定位：以最近的滚动容器（分类列表）或插件内容根为边界，
-  // 判断下拉向上还是向下展开。避免列表底部行/底部添加栏的下拉
-  // 误判为向下展开而被裁剪、被弹窗按钮区遮挡。
-  const getBoundary = (): Element => {
-    const list = input.closest('.ipe-quickCategory__list')
-    if (list) return list
-    return input.closest('.ipe-quickCategory') || m.get$content()
   }
   const positionSuggest = () => {
     if (!suggest.children.length) return
-    const inputRect = input.getBoundingClientRect()
-    const boundaryRect = getBoundary().getBoundingClientRect()
-    const spaceBelow = boundaryRect.bottom - inputRect.bottom
-    const spaceAbove = inputRect.top - boundaryRect.top
+    const ir = input.getBoundingClientRect()
+    const vh = window.innerHeight
     const want = 220
+    const spaceBelow = vh - ir.bottom
+    const spaceAbove = ir.top
+    suggest.style.width = `${Math.max(ir.width, 140)}px`
     if (spaceBelow >= Math.min(want, 200) || spaceBelow >= spaceAbove) {
       // 下方空间足够 -> 向下展开
-      suggest.style.top = 'calc(100% + 4px)'
+      suggest.style.top = `${ir.bottom + 4}px`
       suggest.style.bottom = 'auto'
       suggest.style.maxHeight = `${Math.max(60, Math.min(want, spaceBelow - 8))}px`
     } else {
       // 上方空间更大 -> 向上展开
       suggest.style.top = 'auto'
-      suggest.style.bottom = 'calc(100% + 4px)'
+      suggest.style.bottom = `${vh - ir.top + 4}px`
       suggest.style.maxHeight = `${Math.max(60, Math.min(want, spaceAbove - 8))}px`
     }
+    suggest.style.left = `${ir.left}px`
+    suggest.style.display = 'block'
+    if (suggest.parentElement !== document.body) document.body.appendChild(suggest)
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -498,7 +495,10 @@ function attachAutocomplete(
     if (!suggest.contains(e.target as Node) && !input.contains(e.target as Node)) hideSuggest()
   }
   document.addEventListener('click', onDocClick)
-  m.on(m.Event.Close, () => document.removeEventListener('click', onDocClick))
+  m.on(m.Event.Close, () => {
+    suggest.remove()
+    document.removeEventListener('click', onDocClick)
+  })
   return { hideSuggest }
 }
 
