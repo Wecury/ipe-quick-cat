@@ -340,9 +340,9 @@ function getSearchCache(ctx: Ctx): Map<string, { ts: number; items: CategorySugg
 }
 
 /**
- * 搜索「分类命名空间下真实存在的页面」，含硬重定向（prop=info 的 redirect 字段）。
- * 补全阶段仅请求轻量 prop=info 以保证速度；软重定向（模板式）暂不支持。
- * 结果按前缀缓存 5 分钟。
+ * 搜索「分类命名空间下真实存在的页面」，含硬重定向。
+ * 先用 prop=info 判断是否为重定向，再用 redirects=1 批量解析目标名；
+ * 软重定向（模板式）暂不支持。结果按前缀缓存 5 分钟。
  */
 async function searchCategories(ctx: Ctx, query: string): Promise<CategorySuggestion[]> {
   const q = stripCategoryPrefix(query)
@@ -366,13 +366,35 @@ async function searchCategories(ctx: Ctx, query: string): Promise<CategorySugges
       prop: 'info',
     })
     const pages = data?.query?.pages || {}
-    const items: CategorySuggestion[] = Object.values(pages)
-      .filter((p: any) => p && !p.missing && p.title)
-      .map((p: any) => ({
+    const pageList = Object.values(pages).filter((p: any) => p && !p.missing && p.title)
+    // prop=info 对重定向页返回 redirect 字段（新 MediaWiki 为布尔 true，旧版为字符串标记），
+    // 但目标名不随 prop=info 返回，需再用 redirects=1 批量解析出 from→to。
+    const redirectTitles = pageList
+      .filter((p: any) => typeof p.redirect === 'string' || p.redirect === true)
+      .map((p: any) => p.title)
+    const redirectMap = new Map<string, string>()
+    if (redirectTitles.length) {
+      try {
+        const { data: d2 } = await ctx.api.get({
+          action: 'query',
+          redirects: 1,
+          prop: 'info',
+          titles: redirectTitles.join('|'),
+        })
+        for (const r of d2?.query?.redirects || []) {
+          if (r.from && r.to) redirectMap.set(r.from, r.to)
+        }
+      } catch (e) {
+        log.warn('resolve redirect targets failed:', e)
+      }
+    }
+    const items: CategorySuggestion[] = pageList.map((p: any) => {
+      const target = redirectMap.get(p.title)
+      return {
         name: stripCategoryPrefix(p.title),
-        redirect:
-          typeof p.redirect === 'string' && p.redirect ? stripCategoryPrefix(p.redirect) : null,
-      }))
+        redirect: target ? stripCategoryPrefix(target) : null,
+      }
+    })
     cache.set(q, { ts: Date.now(), items })
     return items
   } catch (e) {
@@ -456,7 +478,7 @@ function attachAutocomplete(
                 title: isRedirect ? item.redirect : undefined,
                 onClick: () => {
                   // 重定向项点击后填入「重定向到的正确分类名」
-                  const value = isRedirect ? item.redirect : item.name
+                  const value = isRedirect ? (item.redirect ?? item.name) : item.name
                   if (handlers.onPick) handlers.onPick(value)
                   else input.value = value
                   hideSuggest()
