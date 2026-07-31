@@ -1,5 +1,5 @@
 /**
- * IPE Quick Category
+ * IPE Quick Cat
  * ==================
  * InPageEdit NEXT 第三方插件：在工具箱新增「快速分类」按钮，
  * 以类似可视化编辑器分类面板的方式查看/编辑当前页面的分类、
@@ -23,13 +23,13 @@ import {
   type CategoryRow,
 } from './parse.js'
 
-const PLUGIN_NAME = 'quick-category'
-const APPLIED_FLAG = Symbol.for('ipe-quick-category.applied')
+const PLUGIN_NAME = 'quick-cat'
+const APPLIED_FLAG = Symbol.for('ipe-quick-cat.applied')
 
 const log = {
-  info: (...args: unknown[]) => console.info('[IPE-QuickCategory]', ...args),
-  warn: (...args: unknown[]) => console.warn('[IPE-QuickCategory]', ...args),
-  error: (...args: unknown[]) => console.error('[IPE-QuickCategory]', ...args),
+  info: (...args: unknown[]) => console.info('[IPE-QuickCat]', ...args),
+  warn: (...args: unknown[]) => console.warn('[IPE-QuickCat]', ...args),
+  error: (...args: unknown[]) => console.error('[IPE-QuickCat]', ...args),
 }
 
 /**
@@ -78,16 +78,16 @@ const I18N = {
     savedDesc: '页面分类已成功更新。',
     saveFailed: '分类保存失败',
     summaryLabel: '编辑摘要',
-    summaryPh: '[IPE-NEXT] Quick category',
-    summaryDefault: '[IPE-NEXT] Quick category',
+    summaryPh: '[IPE-NEXT] Quick Cat',
+    summaryDefault: '[IPE-NEXT] Quick Cat',
     minorEdit: '小编辑',
     reloadAfterSave: '保存后刷新页面',
     notEditable: '当前页面不可编辑，无法修改分类。',
   },
   en: {
-    tooltip: 'Quick Category',
+    tooltip: 'Quick Cat',
     tooltipNotEditable: 'Page is not editable',
-    modalTitle: 'Quick Category',
+    modalTitle: 'Quick Cat',
     cancel: 'Cancel',
     save: 'Save',
     add: 'Add',
@@ -111,8 +111,8 @@ const I18N = {
     savedDesc: 'Page categories have been updated.',
     saveFailed: 'Failed to save categories',
     summaryLabel: 'Edit summary',
-    summaryPh: '[IPE-NEXT] Quick category',
-    summaryDefault: '[IPE-NEXT] Quick category',
+    summaryPh: '[IPE-NEXT] Quick Cat',
+    summaryDefault: '[IPE-NEXT] Quick Cat',
     minorEdit: 'Minor edit',
     reloadAfterSave: 'Reload page after saving',
     notEditable: 'This page is not editable.',
@@ -179,8 +179,8 @@ function i18n(key: string, ...args: (string | number)[]): string {
 function registerPluginI18n(ctx: Ctx): void {
   if (!ctx.i18n?.registerMessages) return
   try {
-    ctx.i18n.registerMessages('en', { ...I18N.en }, { namespace: 'quickCategory' })
-    ctx.i18n.registerMessages('zh', { ...I18N.zh }, { namespace: 'quickCategory' })
+    ctx.i18n.registerMessages('en', { ...I18N.en }, { namespace: 'quickCat' })
+    ctx.i18n.registerMessages('zh', { ...I18N.zh }, { namespace: 'quickCat' })
   } catch (e) {
     log.warn('registerMessages failed:', e)
   }
@@ -472,8 +472,8 @@ function attachAutocomplete(
               'button',
               {
                 class: isRedirect
-                  ? 'ipe-quickCategory__suggest-item is-redirect'
-                  : 'ipe-quickCategory__suggest-item',
+                  ? 'ipe-quick-cat__suggest-item is-redirect'
+                  : 'ipe-quick-cat__suggest-item',
                 type: 'button',
                 title: isRedirect ? item.redirect : undefined,
                 onClick: () => {
@@ -489,7 +489,7 @@ function attachAutocomplete(
             )
             if (isRedirect) {
               btn.append(
-                h('span', { class: 'ipe-quickCategory__suggest-redirect' }, `→ ${item.redirect}`)
+                h('span', { class: 'ipe-quick-cat__suggest-redirect' }, `→ ${item.redirect}`)
               )
             }
             suggest.append(btn)
@@ -550,12 +550,12 @@ function createCategoryRow(
   list: HTMLElement,
   refreshToolbar: () => void
 ): HTMLElement {
-  const rowEl = h('div', { class: 'ipe-quickCategory__row' })
+  const rowEl = h('div', { class: 'ipe-quick-cat__row' })
 
   // 拖动把手（HTML5 拖放排序）
   const grip = h(
     'span',
-    { class: 'ipe-quickCategory__grip', title: i18n('drag'), 'aria-label': i18n('drag') },
+    { class: 'ipe-quick-cat__grip', title: i18n('drag'), 'aria-label': i18n('drag') },
     '⠿'
   )
   grip.draggable = true
@@ -566,29 +566,29 @@ function createCategoryRow(
   })
   grip.addEventListener('dragend', () => {
     rowEl.classList.remove('is-dragging')
-    list.querySelectorAll('.ipe-quickCategory__row').forEach((el) =>
+    list.querySelectorAll('.ipe-quick-cat__row').forEach((el) =>
       el.classList.remove('is-drop-before', 'is-drop-after')
     )
     state._dragIndex = null
   })
 
   const check = h('input', {
-    class: 'ipe-quickCategory__check',
+    class: 'ipe-quick-cat__check',
     type: 'checkbox',
     checked: state.selected.has(row),
   }) as HTMLInputElement
   check.addEventListener('change', () => {
     if (check.checked) state.selected.add(row)
     else state.selected.delete(row)
-    list.querySelectorAll('.ipe-quickCategory__row').forEach((el, i) => {
-      const cb = el.querySelector('.ipe-quickCategory__check') as HTMLInputElement | null
+    list.querySelectorAll('.ipe-quick-cat__row').forEach((el, i) => {
+      const cb = el.querySelector('.ipe-quick-cat__check') as HTMLInputElement | null
       if (cb) cb.checked = state.selected.has(state.rows[i])
     })
     refreshToolbar()
   })
 
   const nameInput = h('input', {
-    class: 'ipe-quickCategory__name',
+    class: 'ipe-quick-cat__name',
     type: 'text',
     value: row.name,
     placeholder: i18n('namePh'),
@@ -598,17 +598,17 @@ function createCategoryRow(
   nameInput.addEventListener('input', () => {
     row.name = nameInput.value.trim()
   })
-  const nameSuggest = h('div', { class: 'ipe-quickCategory__suggest' })
+  const nameSuggest = h('div', { class: 'ipe-quick-cat__suggest' })
   attachAutocomplete(ctx, m, nameInput, nameSuggest, {
     onPick: (cat) => {
       row.name = cat
       nameInput.value = cat
     },
   })
-  const nameWrap = h('span', { class: 'ipe-quickCategory__namewrap' }, nameInput, nameSuggest)
+  const nameWrap = h('span', { class: 'ipe-quick-cat__namewrap' }, nameInput, nameSuggest)
 
   const sortInput = h('input', {
-    class: 'ipe-quickCategory__sortkey',
+    class: 'ipe-quick-cat__sortkey',
     type: 'text',
     value: row.sortkey,
     placeholder: i18n('sortKeyPh'),
@@ -620,7 +620,7 @@ function createCategoryRow(
   const removeBtn = h(
     'button',
     {
-      class: 'ipe-quickCategory__remove',
+      class: 'ipe-quick-cat__remove',
       type: 'button',
       title: i18n('remove'),
       'aria-label': i18n('remove'),
@@ -642,14 +642,14 @@ function createCategoryRow(
 /** 添加分类栏（带自动补全） */
 function createAddBar(ctx: Ctx, m: any, state: CategoryState, refreshList: () => void): HTMLElement {
   const input = h('input', {
-    class: 'ipe-quickCategory__new',
+    class: 'ipe-quick-cat__new',
     type: 'text',
     placeholder: i18n('addPh'),
     autocomplete: 'off',
     spellcheck: 'false',
   }) as HTMLInputElement
-  const suggest = h('div', { class: 'ipe-quickCategory__suggest' })
-  const addBtn = h('button', { class: 'ipe-quickCategory__addbtn', type: 'button' }, i18n('add'))
+  const suggest = h('div', { class: 'ipe-quick-cat__suggest' })
+  const addBtn = h('button', { class: 'ipe-quick-cat__addbtn', type: 'button' }, i18n('add'))
 
   const doAdd = () => {
     const raw = stripCategoryPrefix(input.value)
@@ -669,17 +669,17 @@ function createAddBar(ctx: Ctx, m: any, state: CategoryState, refreshList: () =>
   attachAutocomplete(ctx, m, input, suggest, { onEnter: doAdd })
   addBtn.addEventListener('click', doAdd)
 
-  return h('div', { class: 'ipe-quickCategory__add' }, input, addBtn, suggest)
+  return h('div', { class: 'ipe-quick-cat__add' }, input, addBtn, suggest)
 }
 
 function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
-  const root = h('div', { class: 'ipe-quickCategory' })
+  const root = h('div', { class: 'ipe-quick-cat' })
 
-  const selectAll = h('input', { class: 'ipe-quickCategory__checkall', type: 'checkbox' }) as HTMLInputElement
-  const countEl = h('span', { class: 'ipe-quickCategory__selected-count' }, i18n('selectedCount', 0))
+  const selectAll = h('input', { class: 'ipe-quick-cat__checkall', type: 'checkbox' }) as HTMLInputElement
+  const countEl = h('span', { class: 'ipe-quick-cat__selected-count' }, i18n('selectedCount', 0))
   const deleteBtn = h(
     'button',
-    { class: 'ipe-quickCategory__delete-selected', type: 'button', disabled: true },
+    { class: 'ipe-quick-cat__delete-selected', type: 'button', disabled: true },
     i18n('deleteSelected')
   ) as HTMLButtonElement
 
@@ -692,11 +692,11 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     deleteBtn.disabled = sel === 0
   }
 
-  const list = h('div', { class: 'ipe-quickCategory__list' })
+  const list = h('div', { class: 'ipe-quick-cat__list' })
 
   // 拖放排序：按整行中点分区决定插入位置（覆盖行间隙，指示线唯一、无死区）
   const computeInsertIndex = (clientY: number): number => {
-    const rows = [...list.querySelectorAll('.ipe-quickCategory__row')]
+    const rows = [...list.querySelectorAll('.ipe-quick-cat__row')]
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i].getBoundingClientRect()
       if (clientY < r.top + r.height / 2) return i
@@ -704,7 +704,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     return rows.length
   }
   const clearIndicators = () => {
-    list.querySelectorAll('.ipe-quickCategory__row').forEach((el) =>
+    list.querySelectorAll('.ipe-quick-cat__row').forEach((el) =>
       el.classList.remove('is-drop-before', 'is-drop-after')
     )
   }
@@ -714,7 +714,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     e.dataTransfer.dropEffect = 'move'
     clearIndicators()
     const idx = computeInsertIndex(e.clientY)
-    const rows = [...list.querySelectorAll('.ipe-quickCategory__row')]
+    const rows = [...list.querySelectorAll('.ipe-quick-cat__row')]
     if (idx < rows.length) rows[idx].classList.add('is-drop-before')
     else if (rows.length) rows[rows.length - 1].classList.add('is-drop-after')
   })
@@ -738,8 +738,8 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   selectAll.addEventListener('change', () => {
     if (selectAll.checked) state.rows.forEach((r) => state.selected.add(r))
     else state.selected.clear()
-    list.querySelectorAll('.ipe-quickCategory__row').forEach((el) => {
-      const cb = el.querySelector('.ipe-quickCategory__check') as HTMLInputElement | null
+    list.querySelectorAll('.ipe-quick-cat__row').forEach((el) => {
+      const cb = el.querySelector('.ipe-quick-cat__check') as HTMLInputElement | null
       if (cb) cb.checked = selectAll.checked
     })
     refreshToolbar()
@@ -754,10 +754,10 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
 
   const toolbar = h(
     'div',
-    { class: 'ipe-quickCategory__toolbar' },
+    { class: 'ipe-quick-cat__toolbar' },
     h(
       'label',
-      { class: 'ipe-quickCategory__checkbox' },
+      { class: 'ipe-quick-cat__checkbox' },
       selectAll,
       h('span', {}, i18n('selectAll'))
     ),
@@ -768,7 +768,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   const refreshList = () => {
     list.textContent = ''
     if (state.rows.length === 0) {
-      list.append(h('div', { class: 'ipe-quickCategory__empty' }, i18n('noCategories')))
+      list.append(h('div', { class: 'ipe-quick-cat__empty' }, i18n('noCategories')))
     } else {
       for (const row of state.rows) {
         list.append(createCategoryRow(ctx, m, state, row, refreshList, list, refreshToolbar))
@@ -781,7 +781,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   const addBar = createAddBar(ctx, m, state, refreshList)
 
   const dsInput = h('input', {
-    class: 'ipe-quickCategory__ds-input',
+    class: 'ipe-quick-cat__ds-input',
     type: 'text',
     value: state.defaultSort,
     placeholder: state.pageName || '',
@@ -797,10 +797,10 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
           row.sortkey = newDs
         }
       })
-      list.querySelectorAll('.ipe-quickCategory__row').forEach((rowEl, idx) => {
+      list.querySelectorAll('.ipe-quick-cat__row').forEach((rowEl, idx) => {
         const row = state.rows[idx]
         if (row) {
-          const sortInput = rowEl.querySelector('.ipe-quickCategory__sortkey') as HTMLInputElement | null
+          const sortInput = rowEl.querySelector('.ipe-quick-cat__sortkey') as HTMLInputElement | null
           if (sortInput) sortInput.value = row.sortkey
         }
       })
@@ -809,7 +809,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   const infoBtn = h(
     'button',
     {
-      class: 'ipe-quickCategory__ds-info',
+      class: 'ipe-quick-cat__ds-info',
       type: 'button',
       'aria-label': i18n('defaultSort'),
       onClick: () => {
@@ -827,14 +827,14 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   )
   const dsLabel = h(
     'label',
-    { class: 'ipe-quickCategory__ds' },
-    h('span', { class: 'ipe-quickCategory__ds-text' }, i18n('defaultSort')),
+    { class: 'ipe-quick-cat__ds' },
+    h('span', { class: 'ipe-quick-cat__ds-text' }, i18n('defaultSort')),
     infoBtn,
     dsInput
   )
 
   const summaryInput = h('input', {
-    class: 'ipe-quickCategory__summary-input',
+    class: 'ipe-quick-cat__summary-input',
     type: 'text',
     value: state.summary || '',
     placeholder: i18n('summaryPh'),
@@ -853,18 +853,18 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
 
   const options = h(
     'div',
-    { class: 'ipe-quickCategory__options' },
+    { class: 'ipe-quick-cat__options' },
     h(
       'div',
-      { class: 'ipe-quickCategory__summary-wrap' },
-      h('label', { class: 'ipe-quickCategory__summary-label', for: 'ipe-quickCategory__summary' }, i18n('summaryLabel')),
+      { class: 'ipe-quick-cat__summary-wrap' },
+      h('label', { class: 'ipe-quick-cat__summary-label', for: 'ipe-quick-cat__summary' }, i18n('summaryLabel')),
       summaryInput
     ),
     h(
       'div',
-      { class: 'ipe-quickCategory__options-row' },
-      h('label', { class: 'ipe-quickCategory__checkbox' }, minorCheck, h('span', {}, i18n('minorEdit'))),
-      h('label', { class: 'ipe-quickCategory__checkbox' }, reloadCheck, h('span', {}, i18n('reloadAfterSave')))
+      { class: 'ipe-quick-cat__options-row' },
+      h('label', { class: 'ipe-quick-cat__checkbox' }, minorCheck, h('span', {}, i18n('minorEdit'))),
+      h('label', { class: 'ipe-quick-cat__checkbox' }, reloadCheck, h('span', {}, i18n('reloadAfterSave')))
     )
   )
 
@@ -937,9 +937,9 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
   const m = modal
     .createObject({
       title: `${i18n('modalTitle')}: ${title}`,
-      content: h('div', { class: 'ipe-quickCategory ipe-quickCategory--loading' }, i18n('loading')),
+      content: h('div', { class: 'ipe-quick-cat ipe-quick-cat--loading' }, i18n('loading')),
       // compact-buttons：与 quick-move / quick-redirect 一致的紧凑按钮样式
-      className: 'ipe-quick-category compact-buttons',
+      className: 'ipe-quick-cat compact-buttons',
       sizeClass: 'smallToMedium',
       center: true,
       outSideClose: false,
@@ -1006,9 +1006,9 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
     m.setContent(
       h(
         'div',
-        { class: 'ipe-quickCategory ipe-quickCategory--error' },
+        { class: 'ipe-quick-cat ipe-quick-cat--error' },
         h('p', {}, i18n('loadFailed')),
-        h('p', { class: 'ipe-quickCategory__errmsg' }, String((err as Error)?.message || err))
+        h('p', { class: 'ipe-quick-cat__errmsg' }, String((err as Error)?.message || err))
       )
     )
     modal.notify('error', { title: i18n('loadFailed'), content: String((err as Error)?.message || err) })

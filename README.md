@@ -1,4 +1,4 @@
-# IPE Quick Category
+# IPE Quick Cat
 
 快速编辑页面分类的 [InPageEdit NEXT](https://www.ipe.wiki/)（IPE）插件。
 
@@ -10,7 +10,7 @@
 - 添加分类自动补全，重定向分类自动指向正确分类
 - 拖动排序调整分类书写顺序
 - 编辑默认排序键 `{{DEFAULTSORT}}`，帮助文本自动读取站点系统消息
-- 编辑摘要（默认 `[IPE-NEXT] Quick category`）/ 小编辑 / 保存后刷新
+- 编辑摘要（默认 `[IPE-NEXT] Quick Cat`）/ 小编辑 / 保存后刷新
 - 自动适配 IPE 主题（含深色模式），多语言
 
 ## 📥 安装
@@ -21,7 +21,7 @@
 
 1. 打开任一已安装 InPageEdit 的 wiki 页面
 2. 悬停右下角 IPE 工具箱 → ⚙️ 偏好设置 → 插件商店
-3. 搜索 **Quick Category** → 安装
+3. 搜索 **Quick Cat** → 安装
 4. 刷新页面，工具箱出现「编辑分类」按钮即可使用
 
 > 若商店暂时找不到，说明仍在审核中；可先按下方「开发者本地预览」方式体验。
