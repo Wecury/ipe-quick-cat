@@ -1,0 +1,53 @@
+{
+  "name": "inpageedit-plugin-quick-category",
+  "version": "1.0.0",
+  "description": "Edit page categories in a dialog similar to VisualEditor: add, remove and rename categories, edit sort keys, drag to reorder, and manage the default sort key, with autocomplete support.",
+  "type": "module",
+  "author": "Wecury",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "node --import tsx dev/parse.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "inpageedit",
+    "ipe",
+    "mediawiki",
+    "plugin",
+    "category"
+  ],
+  "$ipe": {
+    "name": "Quick Category",
+    "description": "Edit page categories in a dialog similar to VisualEditor, including sort keys and the default sort key, with autocomplete and drag-to-reorder.",
+    "categories": [
+      "editor",
+      "utility"
+    ],
+    "loader": {
+      "kind": "module",
+      "entry": "dist/index.mjs",
+      "styles": [
+        "dist/style.css"
+      ],
+      "main_export": "default"
+    },
+    "dev_loader": {
+      "entry": "src/index.ts",
+      "styles": [
+        "src/style.scss"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@inpageedit/core": "^0.18.0",
+    "sass": "^1.102.0",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0"
+  }
+}
