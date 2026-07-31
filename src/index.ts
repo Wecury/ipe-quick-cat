@@ -85,9 +85,9 @@ const I18N = {
     notEditable: '当前页面不可编辑，无法修改分类。',
   },
   en: {
-    tooltip: 'Quick category',
+    tooltip: 'Quick Category',
     tooltipNotEditable: 'Page is not editable',
-    modalTitle: 'Quick category',
+    modalTitle: 'Quick Category',
     cancel: 'Cancel',
     save: 'Save',
     add: 'Add',
