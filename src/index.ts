@@ -403,13 +403,20 @@ function attachAutocomplete(
     suggest.textContent = ''
   }
 
-  // 智能定位：以弹窗内容区为边界（而非整个视口），判断下拉向上还是向下展开
+  // 智能定位：以最近的滚动容器（分类列表）或插件内容根为边界，
+  // 判断下拉向上还是向下展开。避免列表底部行/底部添加栏的下拉
+  // 误判为向下展开而被裁剪、被弹窗按钮区遮挡。
+  const getBoundary = (): Element => {
+    const list = input.closest('.ipe-quickCategory__list')
+    if (list) return list
+    return input.closest('.ipe-quickCategory') || m.get$content()
+  }
   const positionSuggest = () => {
     if (!suggest.children.length) return
     const inputRect = input.getBoundingClientRect()
-    const contentRect = m.get$content().getBoundingClientRect()
-    const spaceBelow = contentRect.bottom - inputRect.bottom
-    const spaceAbove = inputRect.top - contentRect.top
+    const boundaryRect = getBoundary().getBoundingClientRect()
+    const spaceBelow = boundaryRect.bottom - inputRect.bottom
+    const spaceAbove = inputRect.top - boundaryRect.top
     const want = 220
     if (spaceBelow >= Math.min(want, 200) || spaceBelow >= spaceAbove) {
       // 下方空间足够 -> 向下展开
