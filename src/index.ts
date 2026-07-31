@@ -549,34 +549,6 @@ function createCategoryRow(
     )
     state._dragIndex = null
   })
-  rowEl.addEventListener('dragover', (e) => {
-    if (state._dragIndex == null) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    // 上半：插到该行之前；下半：插到该行之后
-    const rect = rowEl.getBoundingClientRect()
-    const before = e.clientY < rect.top + rect.height / 2
-    rowEl.classList.toggle('is-drop-before', before)
-    rowEl.classList.toggle('is-drop-after', !before)
-  })
-  rowEl.addEventListener('dragleave', () => {
-    rowEl.classList.remove('is-drop-before', 'is-drop-after')
-  })
-  rowEl.addEventListener('drop', (e) => {
-    e.preventDefault()
-    rowEl.classList.remove('is-drop-before', 'is-drop-after')
-    if (state._dragIndex == null) return
-    const from = state._dragIndex
-    const to = state.rows.indexOf(row)
-    if (from === to) return
-    const rect = rowEl.getBoundingClientRect()
-    const before = e.clientY < rect.top + rect.height / 2
-    const [moved] = state.rows.splice(from, 1)
-    const eff = to > from ? to - 1 : to
-    state.rows.splice(before ? eff : eff + 1, 0, moved)
-    state._dragIndex = null
-    refreshList()
-  })
 
   const check = h('input', {
     class: 'ipe-quickCategory__check',
@@ -699,6 +671,47 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   }
 
   const list = h('div', { class: 'ipe-quickCategory__list' })
+
+  // 拖放排序：按整行中点分区决定插入位置（覆盖行间隙，指示线唯一、无死区）
+  const computeInsertIndex = (clientY: number): number => {
+    const rows = [...list.querySelectorAll('.ipe-quickCategory__row')]
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i].getBoundingClientRect()
+      if (clientY < r.top + r.height / 2) return i
+    }
+    return rows.length
+  }
+  const clearIndicators = () => {
+    list.querySelectorAll('.ipe-quickCategory__row').forEach((el) =>
+      el.classList.remove('is-drop-before', 'is-drop-after')
+    )
+  }
+  list.addEventListener('dragover', (e) => {
+    if (state._dragIndex == null) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    clearIndicators()
+    const idx = computeInsertIndex(e.clientY)
+    const rows = [...list.querySelectorAll('.ipe-quickCategory__row')]
+    if (idx < rows.length) rows[idx].classList.add('is-drop-before')
+    else if (rows.length) rows[rows.length - 1].classList.add('is-drop-after')
+  })
+  list.addEventListener('dragleave', (e) => {
+    const rt = e.relatedTarget
+    if (!(rt instanceof Node) || !list.contains(rt)) clearIndicators()
+  })
+  list.addEventListener('drop', (e) => {
+    e.preventDefault()
+    clearIndicators()
+    if (state._dragIndex == null) return
+    const from = state._dragIndex
+    const to = computeInsertIndex(e.clientY)
+    const [moved] = state.rows.splice(from, 1)
+    const target = from < to ? to - 1 : to
+    state.rows.splice(target, 0, moved)
+    state._dragIndex = null
+    refreshList()
+  })
 
   selectAll.addEventListener('change', () => {
     if (selectAll.checked) state.rows.forEach((r) => state.selected.add(r))
