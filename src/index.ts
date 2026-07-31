@@ -562,7 +562,9 @@ function createCategoryRow(
     const to = state.rows.indexOf(row)
     if (from === to) return
     const [moved] = state.rows.splice(from, 1)
-    state.rows.splice(to, 0, moved)
+    // 插到目标行下方（与「目标行下方高亮线」一致）
+    const targetIndex = to > from ? to - 1 : to
+    state.rows.splice(targetIndex + 1, 0, moved)
     state._dragIndex = null
     refreshList()
   })
