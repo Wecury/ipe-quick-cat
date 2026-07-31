@@ -13,7 +13,7 @@
 }
 .ipe-quick-cat__delete-selected:hover:not(:disabled) { background:var(--ipe-modal-danger); color:var(--ipe-modal-bg); }
 .ipe-quick-cat__delete-selected:disabled { opacity:.45; cursor:not-allowed; }
-.ipe-quick-cat__list { flex:1; display:flex; flex-direction:column; gap:6px; overflow-y:auto; padding:2px; }
+.ipe-quick-cat__list { flex:1; min-height:0; display:flex; flex-direction:column; gap:6px; overflow-y:auto; padding:2px; }
 .ipe-quick-cat__empty { color:var(--ipe-modal-muted); font-size:.9rem; text-align:center; padding:2em 0; }
 .ipe-quick-cat__row { display:flex; align-items:center; gap:8px; }
 .ipe-quick-cat__row.is-dragging { opacity:.4; }
