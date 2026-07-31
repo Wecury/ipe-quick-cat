@@ -544,27 +544,36 @@ function createCategoryRow(
   })
   grip.addEventListener('dragend', () => {
     rowEl.classList.remove('is-dragging')
-    list.querySelectorAll('.ipe-quickCategory__row.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'))
+    list.querySelectorAll('.ipe-quickCategory__row').forEach((el) =>
+      el.classList.remove('is-drop-before', 'is-drop-after')
+    )
     state._dragIndex = null
   })
   rowEl.addEventListener('dragover', (e) => {
     if (state._dragIndex == null) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    rowEl.classList.add('is-drop-target')
+    // 上半：插到该行之前；下半：插到该行之后
+    const rect = rowEl.getBoundingClientRect()
+    const before = e.clientY < rect.top + rect.height / 2
+    rowEl.classList.toggle('is-drop-before', before)
+    rowEl.classList.toggle('is-drop-after', !before)
   })
-  rowEl.addEventListener('dragleave', () => rowEl.classList.remove('is-drop-target'))
+  rowEl.addEventListener('dragleave', () => {
+    rowEl.classList.remove('is-drop-before', 'is-drop-after')
+  })
   rowEl.addEventListener('drop', (e) => {
     e.preventDefault()
-    rowEl.classList.remove('is-drop-target')
+    rowEl.classList.remove('is-drop-before', 'is-drop-after')
     if (state._dragIndex == null) return
     const from = state._dragIndex
     const to = state.rows.indexOf(row)
     if (from === to) return
+    const rect = rowEl.getBoundingClientRect()
+    const before = e.clientY < rect.top + rect.height / 2
     const [moved] = state.rows.splice(from, 1)
-    // 插到目标行下方（与「目标行下方高亮线」一致）
-    const targetIndex = to > from ? to - 1 : to
-    state.rows.splice(targetIndex + 1, 0, moved)
+    const eff = to > from ? to - 1 : to
+    state.rows.splice(before ? eff : eff + 1, 0, moved)
     state._dragIndex = null
     refreshList()
   })

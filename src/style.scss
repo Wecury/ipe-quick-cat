@@ -17,7 +17,8 @@
 .ipe-quickCategory__empty { color:var(--ipe-modal-muted); font-size:.9rem; text-align:center; padding:2em 0; }
 .ipe-quickCategory__row { display:flex; align-items:center; gap:8px; }
 .ipe-quickCategory__row.is-dragging { opacity:.4; }
-.ipe-quickCategory__row.is-drop-target { box-shadow:0 2px 0 0 var(--ipe-modal-accent); }
+.ipe-quickCategory__row.is-drop-before { box-shadow:0 -2px 0 0 var(--ipe-modal-accent); }
+.ipe-quickCategory__row.is-drop-after { box-shadow:0 2px 0 0 var(--ipe-modal-accent); }
 .ipe-quickCategory__grip {
   flex:none; cursor:grab; user-select:none; font-size:1.05rem; line-height:1;
   color:var(--ipe-modal-muted); padding:4px 2px;
