@@ -224,6 +224,34 @@ assertEq(
   'A\n<!-- {{DEFAULTSORT:Hidden}} -->\n{{DEFAULTSORT:New}}\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
 )
 
+// 分类写在章节中间时，拖拽重排保留在原位置（不落到页面底部）
+const CONTENT_SEC = '==章节一==\n[[分类:A]]\n[[分类:B]]\n==章节二==\n'
+const CATS_SEC = parseCategories(CONTENT_SEC).categories // A, B
+out = buildWikitext(
+  CONTENT_SEC,
+  [
+    { _id: 2, name: 'B', sortkey: '', ns: '分类' },
+    { _id: 1, name: 'A', sortkey: '', ns: '分类' },
+  ],
+  '',
+  CATS_SEC
+)
+assertEq('重排分类保留在章节内', out, '==章节一==\n[[分类:B]]\n[[分类:A]]\n==章节二==\n')
+
+// 分类分散在不同章节时，重排回退到末尾重建，但保留所有正文（不误删）
+const CONTENT_DISP = '==甲==\n[[分类:A]]\n==乙==\n[[分类:B]]\n'
+const CATS_DISP = parseCategories(CONTENT_DISP).categories // A, B
+out = buildWikitext(
+  CONTENT_DISP,
+  [
+    { _id: 2, name: 'B', sortkey: '', ns: '分类' },
+    { _id: 1, name: 'A', sortkey: '', ns: '分类' },
+  ],
+  '',
+  CATS_DISP
+)
+assertEq('分散分类重排保留正文', out, '==甲==\n==乙==\n[[分类:B]]\n[[分类:A]]\n')
+
 // ============ isUnchanged ============
 let state = {
   content: CONTENT,
