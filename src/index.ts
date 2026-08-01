@@ -71,15 +71,14 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     noChange: '没有需要保存的更改',
     saved: '分类已保存',
     savedDesc: '页面分类已成功更新。',
-    saveFailed: '分类保存失败',
     summaryLabel: '编辑摘要',
     summaryPh: '[IPE-NEXT] Quick Cat',
     summaryDefault: '[IPE-NEXT] Quick Cat',
     minorEdit: '小编辑',
     reloadAfterSave: '保存后刷新页面',
     notEditable: '当前页面不可编辑，无法修改分类。',
-    conflict: '编辑冲突',
-    conflictDesc: '页面已被其他人修改，请刷新后重试，避免覆盖他人的更改。',
+    submissionError: '提交失败',
+    retryToDismissWarnings: '你可以再次提交以忽略这些警告。',
   },
   en: {
     tooltip: 'Quick Cat',
@@ -106,15 +105,14 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     noChange: 'No changes to save',
     saved: 'Categories saved',
     savedDesc: 'Page categories have been updated.',
-    saveFailed: 'Failed to save categories',
     summaryLabel: 'Edit summary',
     summaryPh: '[IPE-NEXT] Quick Cat',
     summaryDefault: '[IPE-NEXT] Quick Cat',
     minorEdit: 'Minor edit',
     reloadAfterSave: 'Reload page after saving',
     notEditable: 'This page is not editable.',
-    conflict: 'Edit conflict',
-    conflictDesc: 'The page was modified by someone else. Reload and try again to avoid overwriting.',
+    submissionError: 'Submission Error',
+    retryToDismissWarnings: 'You can try to submit again to dismiss the warnings.',
   },
 }
 
@@ -129,6 +127,8 @@ const OFFICIAL_KEYS: Record<string, string> = {
   notEditable: 'Not editable',
   saved: 'Your changes have been saved.',
   summaryLabel: 'Summary',
+  submissionError: 'Submission Error',
+  retryToDismissWarnings: 'You can try to submit again to dismiss the warnings.',
 }
 
 let currentCtx: Ctx | null = null
@@ -891,15 +891,20 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
   } catch (err) {
     log.error('save failed:', err)
     const code = (err as any)?.code || (err as any)?.data?.error?.code
-    if (code === 'editconflict') {
+    if (code === 'pagedeleted' || code === 'editconflict' || code === 'articleexists') {
       modal.notify('warning', {
-        title: i18n('conflict'),
-        content: i18n('conflictDesc'),
-        closeAfter: 10000,
+        title: i18n('submissionError'),
+        content: h(
+          'div',
+          {},
+          h('p', {}, h('strong', {}, String((err as Error)?.message || err))),
+          h('p', {}, i18n('retryToDismissWarnings'))
+        ),
+        closeAfter: 15000,
       })
-    } else {
-      modal.notify('error', { title: i18n('saveFailed'), content: String((err as Error)?.message || err) })
+      return
     }
+    modal.notify('error', { title: i18n('submissionError'), content: String((err as Error)?.message || err) })
   } finally {
     if (!m.isDestroyed) m.setLoadingState(false)
   }
