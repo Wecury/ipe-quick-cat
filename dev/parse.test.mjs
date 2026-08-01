@@ -195,6 +195,24 @@ assertEq(
   'A\n<!-- [[Category:Keep]] -->\n{{T|[[Category:InT]]}}\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
 )
 
+// 注释/模板内的 DEFAULTSORT 在重排时保留（与解析一致）
+const CONTENT_DS_IGN = 'A\n<!-- {{DEFAULTSORT:Hidden}} -->\n{{DEFAULTSORT:Real}}\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
+const CATS_DS_IGN = parseCategories(CONTENT_DS_IGN).categories // 只有 Foo, Bar
+out = buildWikitext(
+  CONTENT_DS_IGN,
+  [
+    { _id: 2, name: 'Bar', sortkey: 'b', ns: 'Category' },
+    { _id: 1, name: 'Foo', sortkey: '', ns: '分类' },
+  ],
+  'New',
+  CATS_DS_IGN
+)
+assertEq(
+  '重排保留注释/模板内DEFAULTSORT',
+  out,
+  'A\n<!-- {{DEFAULTSORT:Hidden}} -->\n{{DEFAULTSORT:New}}\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
+)
+
 // ============ isUnchanged ============
 let state = {
   content: CONTENT,

@@ -78,7 +78,7 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     reloadAfterSave: '保存后刷新页面',
     notEditable: '当前页面不可编辑，无法修改分类。',
     submissionError: '提交失败',
-    retryToDismissWarnings: '你可以再次提交以忽略这些警告。',
+    reopenToRetry: '页面已被他人修改或删除，请重新打开后重试。',
   },
   en: {
     tooltip: 'Quick Cat',
@@ -112,7 +112,7 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     reloadAfterSave: 'Reload page after saving',
     notEditable: 'This page is not editable.',
     submissionError: 'Submission Error',
-    retryToDismissWarnings: 'You can try to submit again to dismiss the warnings.',
+    reopenToRetry: 'The page was modified or deleted by someone else. Reopen the dialog and try again.',
   },
 }
 
@@ -128,7 +128,6 @@ const OFFICIAL_KEYS: Record<string, string> = {
   saved: 'Your changes have been saved.',
   summaryLabel: 'Summary',
   submissionError: 'Submission Error',
-  retryToDismissWarnings: 'You can try to submit again to dismiss the warnings.',
 }
 
 let currentCtx: Ctx | null = null
@@ -373,6 +372,8 @@ function attachAutocomplete(
   const hideSuggest = () => {
     suggest.remove()
     suggest.textContent = ''
+    optionEls = []
+    activeIndex = 0
     input.setAttribute('aria-expanded', 'false')
     input.removeAttribute('aria-activedescendant')
   }
@@ -426,7 +427,10 @@ function attachAutocomplete(
   const render = (resultItems: CategorySuggestion[]) => {
     suggest.textContent = ''
     optionEls = []
-    if (!resultItems.length) return
+    if (!resultItems.length) {
+      hideSuggest()
+      return
+    }
     for (const item of resultItems) {
       const isRedirect = !!item.redirect
       const btn = h(
@@ -870,8 +874,9 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
       text: newText,
       summary: state.summary || i18n('summaryDefault'),
       minor: state.minor,
-      // Explicit revid for precise conflict detection (basetimestamp is second-granular)
-      baserevid: state.page.lastrevid,
+      // Precise conflict detection, but only for existing pages (lastrevid > 0);
+      // new/red-link pages would otherwise send baserevid: 0 and fail with nosuchrevid
+      ...(state.page.lastrevid > 0 ? { baserevid: state.page.lastrevid } : {}),
     })
     if (!m.isDestroyed) m.close()
     if (state.reloadAfterSave) {
@@ -891,14 +896,14 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
   } catch (err) {
     log.error('save failed:', err)
     const code = (err as any)?.code || (err as any)?.data?.error?.code
-    if (code === 'pagedeleted' || code === 'editconflict' || code === 'articleexists') {
+    if (code === 'pagedeleted' || code === 'editconflict') {
       modal.notify('warning', {
         title: i18n('submissionError'),
         content: h(
           'div',
           {},
           h('p', {}, h('strong', {}, String((err as Error)?.message || err))),
-          h('p', {}, i18n('retryToDismissWarnings'))
+          h('p', {}, i18n('reopenToRetry'))
         ),
         closeAfter: 15000,
       })

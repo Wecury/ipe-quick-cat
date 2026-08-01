@@ -181,11 +181,27 @@ export function parseCategories(wikitext: string): Parsed {
 }
 
 export function stripDefaultSort(text: string): string {
-  let out = text.replace(
-    /^[ \t]*\{\{\s*(?:DEFAULTSORT|DEFAULTSORTKEY)\s*:[^\n]*?\}\}[ \t]*\r?\n?/gim,
-    ''
-  )
-  out = out.replace(/\{\{\s*(?:DEFAULTSORT|DEFAULTSORTKEY)\s*:[^\n]*?\}\}/gi, '')
+  // Reuse findDefaultSortMatches so DEFAULTSORT inside comments/templates/nowiki
+  // is ignored, consistent with parsing
+  const matches = findDefaultSortMatches(text)
+  let out = text
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const m = matches[i]
+    let start = m.start
+    let end = m.end + 2 // include the closing }}
+    // A DEFAULTSORT leading a line also drops its indentation and trailing newline
+    let lead = start
+    while (lead > 0 && (out[lead - 1] === ' ' || out[lead - 1] === '\t')) lead--
+    if (lead === 0 || out[lead - 1] === '\n') {
+      start = lead
+      let t = end
+      while (t < out.length && (out[t] === ' ' || out[t] === '\t')) t++
+      if (out[t] === '\r') t++
+      if (out[t] === '\n') t++
+      end = t
+    }
+    out = out.slice(0, start) + out.slice(end)
+  }
   return out
 }
 
