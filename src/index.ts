@@ -6,14 +6,12 @@
  * 排序键与默认排序键 {{DEFAULTSORT}}。
  *
  * @license MIT
- * @see https://www.ipe.wiki/plugins/thirdparty/
- * @see https://www.ipe.wiki/development/
  */
 import './style.scss'
 
 import type { InPageEdit } from '@inpageedit/core'
 
-import { defineIPEPlugin } from './define.js'
+import { defineIPEPlugin } from '~~/defineIPEPlugin.js'
 import {
   buildWikitext,
   isUnchanged,
@@ -50,7 +48,7 @@ type Ctx = InPageEdit & {
 /* ============================================================
  * 国际化
  * ============================================================ */
-const I18N = {
+const I18N: Record<'zh' | 'en', Record<string, string>> = {
   zh: {
     tooltip: '快速分类',
     tooltipNotEditable: '当前页面不可编辑',
@@ -167,7 +165,7 @@ function i18n(key: string, ...args: (string | number)[]): string {
   // 自建字典兜底
   let lang = 'zh-cn'
   try {
-    lang = (window.mw?.config?.get('wgUserLanguage') as string) || lang
+    lang = (mw.config.get('wgUserLanguage') as string) || lang
   } catch {
     /* ignore */
   }
@@ -268,8 +266,8 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
   let lang: string = 'zh'
   try {
     lang =
-      (window.mw?.config?.get('wgContentLanguage') as string) ||
-      (window.mw?.config?.get('wgUserLanguage') as string) ||
+      (mw.config.get('wgContentLanguage') as string) ||
+      (mw.config.get('wgUserLanguage') as string) ||
       lang
   } catch {
     /* ignore */
@@ -299,8 +297,8 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
 
   // mw.msg 兜底（页面已加载该消息时，按用户界面语言）
   try {
-    if (window.mw?.msg) {
-      const msg = window.mw.msg(key)
+    if (mw.msg) {
+      const msg = mw.msg(key)
       // mw.msg 对不存在的消息返回键名本身或 ⧼key⧽ / (key) 形式
       if (msg && msg !== key && !/^[⧼([<]/.test(msg)) {
         _defaultSortHelpCache = msg
@@ -351,11 +349,7 @@ async function searchCategories(ctx: Ctx, query: string): Promise<CategorySugges
   const hit = cache.get(q)
   if (hit && Date.now() - hit.ts < SEARCH_CACHE_TTL) return hit.items
 
-  const nsId =
-    Number(
-      typeof window !== 'undefined' &&
-        (window.mw?.config?.get('wgNamespaceIds') as Record<string, number>)?.category
-    ) || 14
+  const nsId = Number((mw.config.get('wgNamespaceIds') as Record<string, number>)?.category) || 14
   try {
     const { data } = await ctx.api.get({
       action: 'query',
@@ -561,7 +555,7 @@ function createCategoryRow(
   grip.draggable = true
   grip.addEventListener('dragstart', (e) => {
     state._dragIndex = state.rows.indexOf(row)
-    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer!.effectAllowed = 'move'
     rowEl.classList.add('is-dragging')
   })
   grip.addEventListener('dragend', () => {
@@ -711,7 +705,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   list.addEventListener('dragover', (e) => {
     if (state._dragIndex == null) return
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer!.dropEffect = 'move'
     clearIndicators()
     const idx = computeInsertIndex(e.clientY)
     const rows = [...list.querySelectorAll('.ipe-quick-cat__row')]
@@ -916,7 +910,7 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
     }
   } catch (err) {
     log.error('save failed:', err)
-    modal.notify('error', { title: i18n('saveFailed'), content: String(err?.message || err) })
+    modal.notify('error', { title: i18n('saveFailed'), content: String((err as Error)?.message || err) })
   } finally {
     if (!m.isDestroyed) m.setLoadingState(false)
   }
@@ -929,7 +923,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
   const { modal } = ctx
   const title =
     ctx.currentPage?.wikiTitle?.getPrefixedText?.() ||
-    ((window.mw?.config?.get('wgPageName') as string) || '').replace(/_/g, ' ')
+    ((mw.config.get('wgPageName') as string) || '').replace(/_/g, ' ')
   if (!title) {
     modal.notify('warning', { title: i18n('modalTitle'), content: i18n('notEditable') })
     return
@@ -985,7 +979,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
       title,
       pageName:
         ctx.currentPage?.wikiTitle?.getPrefixedText?.() ||
-        ((window.mw?.config?.get('wgPageName') as string) || title).replace(/_/g, ' '),
+        ((mw.config.get('wgPageName') as string) || title).replace(/_/g, ' '),
       page,
       content,
       categories: parsed.categories,
@@ -1044,11 +1038,11 @@ export default defineIPEPlugin({
 
     let action = 'view'
     try {
-      action = c.currentPage?.wikiAction || (window.mw?.config?.get('wgAction') as string) || 'view'
+      action = c.currentPage?.wikiAction || (mw.config.get('wgAction') as string) || 'view'
     } catch {
       /* ignore */
     }
-    const editable = !!window.mw?.config?.get('wgIsProbablyEditable')
+    const editable = !!mw.config.get('wgIsProbablyEditable')
     const canEdit = editable && action === 'view'
 
     // 顶层 inject 已声明 toolbox，可直接使用；卸载时通过 dispose 清理副作用

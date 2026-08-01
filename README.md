@@ -47,9 +47,9 @@ clone [inpageedit/plugin-registry](https://github.com/inpageedit/plugin-registry
 src/
 ├── index.ts   # 插件入口与 UI（defineIPEPlugin；注入 toolbox / modal / wikiPage / api）
 ├── parse.ts   # wikitext 解析 / 生成（纯函数，仅依赖 mw.config）
-├── style.scss # 样式（--ipe-modal-* 主题变量，BEM 命名）
-├── define.ts  # defineIPEPlugin 助手
-└── env.d.ts   # mw 类型声明
+└── style.scss # 样式（--ipe-modal-* 主题变量，BEM 命名）
+harness/       # 独立构建外壳：defineIPEPlugin 助手 / Promise.withResolvers / 类型声明
+               #（内容与官方注册表 common/ 一致，`~~/defineIPEPlugin.js` 别名指向此处）
 ```
 
 - 构建：`npm run build` → `dist/index.mjs` + `dist/style.css`

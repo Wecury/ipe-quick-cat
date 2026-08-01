@@ -1,5 +1,5 @@
 /**
- * WikiText 分类解析 / 生成（纯逻辑，可在测试中直接运行）
+ * WikiText 分类解析 / 生成（纯逻辑，可独立测试）
  * ============================================================
  */
 
@@ -45,10 +45,7 @@ export function getCategoryNamespaceAlt(): string {
   if (_catNsAlt) return _catNsAlt
   let nsIds: Record<string, number> = {}
   try {
-    nsIds =
-      (typeof window !== 'undefined' &&
-        ((window.mw?.config?.get('wgNamespaceIds') as Record<string, number>) || {})) ||
-      {}
+    nsIds = (mw.config.get('wgNamespaceIds') as Record<string, number>) || {}
   } catch {
     /* ignore */
   }
@@ -70,10 +67,8 @@ export function getCategoryNamespaceAlt(): string {
  */
 export function getCategoryNamespaceName(): string {
   try {
-    const formatted =
-      (window.mw?.config?.get('wgFormattedNamespaces') as Record<string, string>) || {}
-    const nsId =
-      Number((window.mw?.config?.get('wgNamespaceIds') as Record<string, number>)?.category) || 14
+    const formatted = (mw.config.get('wgFormattedNamespaces') as Record<string, string>) || {}
+    const nsId = Number((mw.config.get('wgNamespaceIds') as Record<string, number>)?.category) || 14
     const name = formatted[String(nsId)]
     if (typeof name === 'string' && name) return name
   } catch {

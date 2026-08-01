@@ -9,18 +9,19 @@ import {
   stripCategoryPrefix,
 } from '../src/parse.js'
 
-// 模拟 MediaWiki 环境：中文 wiki，分类命名空间本地化名「分类」+ 别名「分類/Cat」
-globalThis.window = {
-  mw: {
-    config: {
-      get: (key) => {
-        if (key === 'wgNamespaceIds') return { category: 14, 分类: 14, 分類: 14, Cat: 14 }
-        if (key === 'wgFormattedNamespaces') return { '14': '分类' }
-        return undefined
-      },
+// 模拟 MediaWiki 环境：中文 wiki，分类命名空间本地化名「分类」+ 别名「分類/Cat」。
+// src/parse.ts 读取全局 mw（与注册表版本一致），因此同时设置 globalThis.mw 与 window.mw。
+const mwMock = {
+  config: {
+    get: (key) => {
+      if (key === 'wgNamespaceIds') return { category: 14, 分类: 14, 分類: 14, Cat: 14 }
+      if (key === 'wgFormattedNamespaces') return { '14': '分类' }
+      return undefined
     },
   },
 }
+globalThis.mw = mwMock
+globalThis.window = { mw: mwMock }
 
 // 提取内容字段（忽略 _id/start/end 等位置信息）
 const catsPlain = (cats) => cats.map((c) => ({ ns: c.ns, name: c.name, sortkey: c.sortkey }))
