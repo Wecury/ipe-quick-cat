@@ -1,8 +1,3 @@
-/**
- * WikiText 分类解析 / 生成（纯逻辑，可独立测试）
- * ============================================================
- */
-
 export interface CategoryRef {
   _id: number
   ns: string
@@ -36,11 +31,7 @@ export function escapeRegExp(str: string): string {
 
 let _catNsAlt: string | null = null
 
-/**
- * 当前 wiki 的「分类」命名空间前缀交替（自动本地化）。
- * 通过 wgNamespaceIds 找到 Category 命名空间对应的全部名称
- * （如 Category / 分类 / 分類），无 mw 环境时回退到 "Category"。
- */
+// Localized category namespace aliases (e.g. Category / 分类 / 分類)
 export function getCategoryNamespaceAlt(): string {
   if (_catNsAlt) return _catNsAlt
   let nsIds: Record<string, number> = {}
@@ -61,10 +52,7 @@ export function getCategoryNamespaceAlt(): string {
   return _catNsAlt
 }
 
-/**
- * 当前 wiki 的「分类」命名空间规范名（用于生成新链接）。
- * 与 HotCat 一致：HC.category_canonical = formattedNamespaces['14']。
- */
+// Canonical namespace name for new links (matches HotCat)
 export function getCategoryNamespaceName(): string {
   try {
     const formatted = (mw.config.get('wgFormattedNamespaces') as Record<string, string>) || {}
@@ -77,13 +65,11 @@ export function getCategoryNamespaceName(): string {
   return 'Category'
 }
 
-/** 剥离名称前可能带有的（本地化）分类命名空间前缀，如 "Category:"、"分类:" */
 export function stripCategoryPrefix(name: string): string {
   const alt = getCategoryNamespaceAlt()
   return String(name).replace(new RegExp(`^\\s*(?:${alt})\\s*:`, 'i'), '').trim()
 }
 
-/** 提取 {{DEFAULTSORT:...}} / {{DEFAULTSORTKEY:...}} 的值（支持嵌套 {{ }}） */
 export function findDefaultSortMatches(text: string): DefaultSortMatch[] {
   const matches: DefaultSortMatch[] = []
   const re = /\{\{\s*(?:DEFAULTSORT|DEFAULTSORTKEY)\s*:\s*/gi
@@ -102,17 +88,14 @@ export function findDefaultSortMatches(text: string): DefaultSortMatch[] {
         i++
       }
     }
-    if (depth !== 0) continue // 未闭合，忽略
+    if (depth !== 0) continue // skip unclosed
     const end = i - 2
     matches.push({ start: m.index, end, value: text.slice(re.lastIndex, end).trim() })
   }
   return matches
 }
 
-/**
- * 解析 wikitext，提取直接书写的分类与默认排序键。
- * 注意：[[:Category:...]]（展示链接）会被正则排除。
- */
+// Exclude display links such as [[:Category:...]]
 export function parseCategories(wikitext: string): Parsed {
   const categories: CategoryRef[] = []
   const ds = findDefaultSortMatches(wikitext)
@@ -136,7 +119,6 @@ export function parseCategories(wikitext: string): Parsed {
   return { categories, defaultSort: ds[0]?.value || '' }
 }
 
-/** 移除整行 / 行内的 DEFAULTSORT 模板 */
 export function stripDefaultSort(text: string): string {
   let out = text.replace(
     /^[ \t]*\{\{\s*(?:DEFAULTSORT|DEFAULTSORTKEY)\s*:[^\n]*?\}\}[ \t]*\r?\n?/gim,
@@ -146,7 +128,6 @@ export function stripDefaultSort(text: string): string {
   return out
 }
 
-/** 移除分类链接（优先整行移除，再处理行内残留） */
 export function stripCategoryLinks(text: string): string {
   const alt = getCategoryNamespaceAlt()
   let out = text.replace(
@@ -157,7 +138,6 @@ export function stripCategoryLinks(text: string): string {
   return out
 }
 
-/** 生成单个分类链接（保留原前缀；新增分类用站点规范名） */
 export function renderLink(
   r: { name: string; sortkey?: string | null; ns?: string | null },
   defaultSort: string,
@@ -171,7 +151,7 @@ export function renderLink(
   return sk && !useDefault ? `[[${ns}:${name}|${sk}]]` : `[[${ns}:${name}]]`
 }
 
-/** 全量重建：移除旧分类与 DEFAULTSORT，统一按新顺序追加到末尾（用于用户主动拖动重排） */
+// Full rebuild: strip old categories and DEFAULTSORT, append everything in order (used after drag reorder)
 export function buildAppend(original: string, rows: CategoryRow[], defaultSort: string): string {
   let text = stripDefaultSort(original)
   text = stripCategoryLinks(text)
@@ -188,10 +168,8 @@ export function buildAppend(original: string, rows: CategoryRow[], defaultSort: 
   return `${text}\n${lines.join('\n')}\n`
 }
 
-/**
- * 原位更新（HotCat 风格）：已有分类在原本位置更新/删除，
- * DEFAULTSORT 原位替换，新增分类追加到末尾——不会把分类强行移到末尾。
- */
+// In-place update (HotCat style): existing categories keep their positions,
+// DEFAULTSORT is replaced in place, new categories are appended at the end
 export function buildInPlace(
   original: string,
   rows: CategoryRow[],
@@ -205,7 +183,7 @@ export function buildInPlace(
 
   let text = original
 
-  // DEFAULTSORT 原位更新或移除
+  // Update/remove DEFAULTSORT in place
   const dsMatches = findDefaultSortMatches(text)
   for (let i = dsMatches.length - 1; i >= 0; i--) {
     const m = dsMatches[i]
@@ -214,7 +192,7 @@ export function buildInPlace(
       text.slice(0, m.start) + (defaultSort ? `{{DEFAULTSORT:${defaultSort}}}` : '') + text.slice(fullEnd)
   }
 
-  // 分类原位更新/删除（从后往前避免索引位移）
+  // Update/delete categories in place (reverse order keeps offsets valid)
   const ordered = [...originalCats].sort((a, b) => b.start - a.start)
   for (const c of ordered) {
     const row = rowById.get(c._id)
@@ -223,7 +201,7 @@ export function buildInPlace(
   }
   text = text.replace(/\n{3,}/g, '\n\n').trim()
 
-  // 新增分类（及原本没有的 DEFAULTSORT）追加到末尾
+  // Append new categories (and DEFAULTSORT if absent) at the end
   const newLines: string[] = []
   if (defaultSort && !dsMatches.length) newLines.push(`{{DEFAULTSORT:${defaultSort}}}`)
   for (const r of additions) {
@@ -234,7 +212,8 @@ export function buildInPlace(
   return `${text}\n${newLines.join('\n')}\n`
 }
 
-/** 用户是否拖动了已有分类的相对顺序（拖动 = 主动重排，才整体重建到末尾） */
+// True when the user reordered existing categories via drag
+// (a full rebuild is then used; otherwise update in place)
 export function isReordered(rows: CategoryRow[], originalCats: CategoryRef[]): boolean {
   const orig = originalCats
     .filter((c) => rows.some((r) => r._id === c._id))
@@ -243,11 +222,6 @@ export function isReordered(rows: CategoryRow[], originalCats: CategoryRef[]): b
   return orig.join(',') !== cur.join(',')
 }
 
-/**
- * 根据用户操作生成新 wikitext：
- * - 未拖动排序：原位更新/删除，新增追加末尾（HotCat 风格，保持分类原位置）
- * - 拖动排序：整体按新顺序重建到末尾（用户主动重排）
- */
 export function buildWikitext(
   original: string,
   rows: CategoryRow[],
@@ -258,7 +232,7 @@ export function buildWikitext(
   return buildInPlace(original, rows, defaultSort, originalCats)
 }
 
-/** 判断用户是否改动了任何内容（基于最终生成文本的确定性比较） */
+// Deterministic comparison of the generated text to detect changes
 export function isUnchanged(state: {
   content: string
   categories: CategoryRef[]

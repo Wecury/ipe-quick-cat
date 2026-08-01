@@ -1,12 +1,3 @@
-/**
- * IPE Quick Cat
- * ==================
- * InPageEdit NEXT 第三方插件：在工具箱新增「快速分类」按钮，
- * 以类似可视化编辑器分类面板的方式查看/编辑当前页面的分类、
- * 排序键与默认排序键 {{DEFAULTSORT}}。
- *
- * @license MIT
- */
 import './style.scss'
 
 import type { InPageEdit } from '@inpageedit/core'
@@ -30,10 +21,6 @@ const log = {
   error: (...args: unknown[]) => console.error('[IPE-QuickCat]', ...args),
 }
 
-/**
- * IPE 上下文 + 本插件用到的扩展成员
- * （@inpageedit/core 类型未完整覆盖的服务用 any 兜底）
- */
 type Ctx = InPageEdit & {
   $$: (strings: TemplateStringsArray, ...args: unknown[]) => string
   api: any
@@ -45,9 +32,6 @@ type Ctx = InPageEdit & {
   [k: string]: any
 }
 
-/* ============================================================
- * 国际化
- * ============================================================ */
 const I18N: Record<'zh' | 'en', Record<string, string>> = {
   zh: {
     tooltip: '快速分类',
@@ -117,10 +101,6 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
   },
 }
 
-/**
- * 可复用的官方 i18n 消息键（registry.ipe.wiki/i18n 的键 = 英文文本）。
- * 这些通用词 IPE 官方字典已有全部语言的 Crowdin 翻译，直接复用。
- */
 const OFFICIAL_KEYS: Record<string, string> = {
   cancel: 'Cancel',
   save: 'Save',
@@ -134,24 +114,19 @@ const OFFICIAL_KEYS: Record<string, string> = {
   summaryLabel: 'Summary',
 }
 
-/** 记录当前插件上下文，便于 i18n() 优先使用官方字典 */
 let currentCtx: Ctx | null = null
 
-/**
- * 轻量国际化：优先复用 IPE 官方字典（OFFICIAL_KEYS），否则回退自建 zh/en 字典。
- * 支持 {{ $1 }} 位置参数插值。
- */
+// Lightweight i18n: reuse the official dict when possible, else built-in zh/en
 function i18n(key: string, ...args: (string | number)[]): string {
   const interpolateMsg = (msg: string) =>
     args.length
       ? msg.replace(/\{\{\s*\$(\d+)\s*\}\}/g, (_, i) => String(args[Number(i) - 1] ?? ''))
       : msg
 
-  // 官方字典优先（对映射到的通用键）
   const official = OFFICIAL_KEYS[key]
   if (official && currentCtx && currentCtx.$$) {
     try {
-      // 手动构造 TemplateStringsArray 以标签形式调用 $$`...`
+      // Call the $$ tag function with a synthetic template
       const ts = Object.assign([official], { raw: [official] }) as unknown as TemplateStringsArray
       const officialMsg = currentCtx.$$(ts)
       if (officialMsg && officialMsg !== `(${official})`) {
@@ -162,7 +137,6 @@ function i18n(key: string, ...args: (string | number)[]): string {
     }
   }
 
-  // 自建字典兜底
   let lang = 'zh-cn'
   try {
     lang = (mw.config.get('wgUserLanguage') as string) || lang
@@ -173,7 +147,6 @@ function i18n(key: string, ...args: (string | number)[]): string {
   return interpolateMsg(table[key] ?? I18N.en[key] ?? key)
 }
 
-/** 把插件消息注册进 IPE 官方 i18n 命名空间（qqx 调试、语言热切换等管道兼容） */
 function registerPluginI18n(ctx: Ctx): void {
   if (!ctx.i18n?.registerMessages) return
   try {
@@ -184,9 +157,6 @@ function registerPluginI18n(ctx: Ctx): void {
   }
 }
 
-/* ============================================================
- * DOM 工具
- * ============================================================ */
 function h(
   tag: string,
   props: Record<string, any> = {},
@@ -220,7 +190,6 @@ function h(
   return el
 }
 
-/** 工具箱按钮图标（Tabler tag，SVG，通过 innerHTML 解析以获得正确命名空间） */
 const TAG_ICON_SVG = `
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -236,7 +205,6 @@ function createTagIcon(): HTMLElement {
   return wrapper.firstElementChild as HTMLElement
 }
 
-/** 默认排序键帮助图标（Tabler info-circle，SVG） */
 const INFO_ICON_SVG = `
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -253,13 +221,9 @@ function createInfoIcon(): HTMLElement {
   return wrapper.firstElementChild as HTMLElement
 }
 
-/** 默认排序键帮助文本缓存（同一站点只查询一次） */
 let _defaultSortHelpCache: string | null = null
 
-/**
- * 获取「默认排序键」帮助文本：先经 API（allmessages，站点内容语言）查询，
- * 拿不到再用 mw.msg，最后回退内置英文。
- */
+// Fetch the default-sort help: API (allmessages) first, then mw.msg, then built-in
 async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
   if (_defaultSortHelpCache) return _defaultSortHelpCache
   const key = 'visualeditor-dialog-meta-categories-defaultsort-help'
@@ -273,7 +237,6 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
     /* ignore */
   }
 
-  // API 主路径（含本地 MediaWiki 命名空间覆盖）
   try {
     const { data } = await ctx.api.get({
       action: 'query',
@@ -283,7 +246,7 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
       amincludelocal: 1,
     })
     const m = data?.query?.allmessages?.[0]
-    // formatversion=2（mw.Api 默认）下消息字段为 content，旧格式为 *
+    // formatversion=2 exposes 'content'; legacy uses '*'
     const text: string | undefined = m && (m['*'] || m.content)
     if (m && !m.missing && text && text !== key) {
       _defaultSortHelpCache = text
@@ -295,11 +258,10 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
     log.warn('getDefaultSortHelp api failed:', e)
   }
 
-  // mw.msg 兜底（页面已加载该消息时，按用户界面语言）
   try {
     if (mw.msg) {
       const msg = mw.msg(key)
-      // mw.msg 对不存在的消息返回键名本身或 ⧼key⧽ / (key) 形式
+      // mw.msg returns the key itself when the message is missing
       if (msg && msg !== key && !/^[⧼([<]/.test(msg)) {
         _defaultSortHelpCache = msg
         return msg
@@ -309,22 +271,18 @@ async function getDefaultSortHelp(ctx: Ctx): Promise<string> {
     /* ignore */
   }
 
-  // 内置兜底
   _defaultSortHelpCache =
     'You can override how this page is sorted when displayed within a category by setting a different index to sort with instead. This is often used to make pages about people show by last name, but be named with their first name shown first.'
   log.warn('default sort help: fell back to built-in English')
   return _defaultSortHelpCache
 }
 
-/* ============================================================
- * 分类搜索（自动补全）
- * ============================================================ */
 interface CategorySuggestion {
   name: string
   redirect: string | null
 }
 
-// 搜索结果缓存：按 ctx 隔离（避免跨 wiki 串数据），TTL 5 分钟
+// Per-context search cache, 5-minute TTL
 const searchCaches = new WeakMap<object, Map<string, { ts: number; items: CategorySuggestion[] }>>()
 const SEARCH_CACHE_TTL = 5 * 60 * 1000
 
@@ -337,11 +295,7 @@ function getSearchCache(ctx: Ctx): Map<string, { ts: number; items: CategorySugg
   return cache
 }
 
-/**
- * 搜索「分类命名空间下真实存在的页面」，含硬重定向。
- * 先用 prop=info 判断是否为重定向，再用 redirects=1 批量解析目标名；
- * 软重定向（模板式）暂不支持。结果按前缀缓存 5 分钟。
- */
+// Search existing category pages (incl. hard redirects); results cached by prefix
 async function searchCategories(ctx: Ctx, query: string): Promise<CategorySuggestion[]> {
   const q = stripCategoryPrefix(query)
   if (!q) return []
@@ -361,8 +315,7 @@ async function searchCategories(ctx: Ctx, query: string): Promise<CategorySugges
     })
     const pages = data?.query?.pages || {}
     const pageList = Object.values(pages).filter((p: any) => p && !p.missing && p.title)
-    // prop=info 对重定向页返回 redirect 字段（新 MediaWiki 为布尔 true，旧版为字符串标记），
-    // 但目标名不随 prop=info 返回，需再用 redirects=1 批量解析出 from→to。
+    // prop=info marks redirects (boolean on modern MW); resolve targets via redirects=1
     const redirectTitles = pageList
       .filter((p: any) => typeof p.redirect === 'string' || p.redirect === true)
       .map((p: any) => p.title)
@@ -397,17 +350,12 @@ async function searchCategories(ctx: Ctx, query: string): Promise<CategorySugges
   }
 }
 
-/* ============================================================
- * 弹窗 UI
- * ============================================================ */
 interface AutocompleteHandlers {
   onPick?: (cat: string) => void
   onEnter?: () => void
 }
 
-/**
- * 通用自动补全：为任意输入框挂载「分类搜索补全」下拉（防抖 + 请求序号防串扰）。
- */
+// Generic autocomplete dropdown: debounced input, guarded by a request sequence
 function attachAutocomplete(
   ctx: Ctx,
   m: any,
@@ -415,7 +363,7 @@ function attachAutocomplete(
   suggest: HTMLElement,
   handlers: AutocompleteHandlers = {}
 ): { hideSuggest: () => void } {
-  // 下拉挂到 body 用 fixed 定位，避免被可滚动的分类列表（overflow-y:auto）裁剪
+  // Render as a fixed portal on body so the scrollable list can't clip it
   const hideSuggest = () => {
     suggest.remove()
     suggest.textContent = ''
@@ -429,12 +377,10 @@ function attachAutocomplete(
     const spaceAbove = ir.top
     suggest.style.width = `${Math.max(ir.width, 140)}px`
     if (spaceBelow >= Math.min(want, 200) || spaceBelow >= spaceAbove) {
-      // 下方空间足够 -> 向下展开
       suggest.style.top = `${ir.bottom + 4}px`
       suggest.style.bottom = 'auto'
       suggest.style.maxHeight = `${Math.max(60, Math.min(want, spaceBelow - 8))}px`
     } else {
-      // 上方空间更大 -> 向上展开
       suggest.style.top = 'auto'
       suggest.style.bottom = `${vh - ir.top + 4}px`
       suggest.style.maxHeight = `${Math.max(60, Math.min(want, spaceAbove - 8))}px`
@@ -471,7 +417,7 @@ function attachAutocomplete(
                 type: 'button',
                 title: isRedirect ? item.redirect : undefined,
                 onClick: () => {
-                  // 重定向项点击后填入「重定向到的正确分类名」
+                  // Pick the redirect target so the real category is saved
                   const value = isRedirect ? (item.redirect ?? item.name) : item.name
                   if (handlers.onPick) handlers.onPick(value)
                   else input.value = value
@@ -502,7 +448,6 @@ function attachAutocomplete(
       input.blur()
     }
   })
-  // 点击其它区域时收起下拉
   const onDocClick = (e: MouseEvent) => {
     if (m.isDestroyed) {
       document.removeEventListener('click', onDocClick)
@@ -534,7 +479,6 @@ interface CategoryState {
   rows: CategoryRow[]
 }
 
-/** 创建一行分类编辑项：拖动把手 + 多选 + 名称（带补全）+ 排序键 + 移除 */
 function createCategoryRow(
   ctx: Ctx,
   m: any,
@@ -546,7 +490,6 @@ function createCategoryRow(
 ): HTMLElement {
   const rowEl = h('div', { class: 'ipe-quick-cat__row' })
 
-  // 拖动把手（HTML5 拖放排序）
   const grip = h(
     'span',
     { class: 'ipe-quick-cat__grip', title: i18n('drag'), 'aria-label': i18n('drag') },
@@ -628,12 +571,10 @@ function createCategoryRow(
     '✕'
   )
 
-  // checkbox 置于最前，与顶部工具栏的「全选」垂直对齐
   rowEl.append(check, grip, nameWrap, sortInput, removeBtn)
   return rowEl
 }
 
-/** 添加分类栏（带自动补全） */
 function createAddBar(ctx: Ctx, m: any, state: CategoryState, refreshList: () => void): HTMLElement {
   const input = h('input', {
     class: 'ipe-quick-cat__new',
@@ -688,7 +629,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
 
   const list = h('div', { class: 'ipe-quick-cat__list' })
 
-  // 拖放排序：按整行中点分区决定插入位置（覆盖行间隙，指示线唯一、无死区）
+  // Drag sort: insertion index decided by each row's midpoint
   const computeInsertIndex = (clientY: number): number => {
     const rows = [...list.querySelectorAll('.ipe-quick-cat__row')]
     for (let i = 0; i < rows.length; i++) {
@@ -784,7 +725,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     const oldDs = state.defaultSort
     const newDs = dsInput.value.trim()
     state.defaultSort = newDs
-    // 原排序键等于旧 DEFAULTSORT 的分类，跟随新的默认排序键（与 VE 行为一致）
+    // Rows matching the old default sort follow the new one (VE behavior)
     if (oldDs && newDs && oldDs.toLowerCase() !== newDs.toLowerCase()) {
       state.rows.forEach((row) => {
         if (row.sortkey && row.sortkey.toLowerCase() === oldDs.toLowerCase()) {
@@ -866,9 +807,6 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   m.setContent(root)
 }
 
-/* ============================================================
- * 保存
- * ============================================================ */
 async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Promise<void> {
   if (!state) return
   const { modal } = ctx
@@ -894,7 +832,6 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
     })
     if (!m.isDestroyed) m.close()
     if (state.reloadAfterSave) {
-      // 保存后短暂提示并自动刷新
       modal.notify('success', {
         title: i18n('saved'),
         content: i18n('savedDesc'),
@@ -916,9 +853,6 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
   }
 }
 
-/* ============================================================
- * 弹窗入口
- * ============================================================ */
 async function showModal(ctx: Ctx, config: any): Promise<any> {
   const { modal } = ctx
   const title =
@@ -933,9 +867,8 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
     .createObject({
       title: `${i18n('modalTitle')}: ${title}`,
       content: h('div', { class: 'ipe-quick-cat ipe-quick-cat--loading' }, i18n('loading')),
-      // compact-buttons：与 quick-move / quick-redirect 一致的紧凑按钮样式；
-      // 注意 className 会作用在弹窗窗口上，因此只保留 compact-buttons，
-      // 插件内容样式由内容根节点 .ipe-quick-cat 自行负责。
+      // className lands on the modal window: keep only compact-buttons there;
+      // plugin styles live on the content root (.ipe-quick-cat)
       className: 'compact-buttons',
       sizeClass: 'smallToMedium',
       center: true,
@@ -943,7 +876,6 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
     })
     .init()
 
-  // 标题与快速编辑同款：`快速分类: <u>页面名</u>`
   {
     const titleFrag = document.createDocumentFragment()
     titleFrag.append(document.createTextNode(`${i18n('modalTitle')}: `))
@@ -1016,19 +948,15 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
   return m
 }
 
-/* ============================================================
- * 插件定义
- * ============================================================ */
 export default defineIPEPlugin({
   name: PLUGIN_NAME,
   inject: ['toolbox', 'modal', 'wikiPage', 'api'],
   apply(ctx: InPageEdit, config?: any): void {
     const c = ctx as Ctx
-    // 防止同一上下文内重复注册（插件商店 + 用户脚本同时加载时）
+    // Prevent duplicate registration (plugin store + userscript both load)
     if ((c as any)[APPLIED_FLAG]) return
     ;(c as any)[APPLIED_FLAG] = true
 
-    // 供 i18n() 优先使用官方字典；卸载时清理
     currentCtx = c
     c.on('dispose', () => {
       if (currentCtx === c) currentCtx = null
@@ -1045,14 +973,13 @@ export default defineIPEPlugin({
     const editable = !!mw.config.get('wgIsProbablyEditable')
     const canEdit = editable && action === 'view'
 
-    // 顶层 inject 已声明 toolbox，可直接使用；卸载时通过 dispose 清理副作用
     c.toolbox.addButton({
       id: PLUGIN_NAME,
       group: 'group2',
       index: 0,
       icon: createTagIcon(),
       tooltip: () => (canEdit ? i18n('tooltip') : i18n('tooltipNotEditable')),
-      // 不可编辑时：不隐藏按钮，仅灰化 + 禁止光标
+      // Disabled: grey out instead of hiding
       buttonProps: canEdit
         ? undefined
         : { style: { cursor: 'not-allowed', filter: 'grayscale(50%) opacity(.75)' } },
