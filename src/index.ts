@@ -535,7 +535,6 @@ function createCategoryRow(
   state: CategoryState,
   row: CategoryRow,
   refreshList: () => void,
-  list: HTMLElement,
   refreshToolbar: () => void
 ): HTMLElement {
   const rowEl = h('div', { class: 'ipe-quick-cat__row' })
@@ -750,7 +749,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
       list.append(h('div', { class: 'ipe-quick-cat__empty' }, i18n('noCategories')))
     } else {
       for (const row of state.rows) {
-        list.append(createCategoryRow(ctx, m, state, row, refreshList, list, refreshToolbar))
+        list.append(createCategoryRow(ctx, m, state, row, refreshList, refreshToolbar))
       }
     }
     refreshToolbar()
@@ -1049,6 +1048,7 @@ export default defineIPEPlugin({
     currentCtx = c
     c.on('dispose', () => {
       if (currentCtx === c) currentCtx = null
+      _logger = null
     })
 
     let action = 'view'

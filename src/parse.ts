@@ -32,7 +32,11 @@ export function escapeRegExp(str: string): string {
 // Blank out comments, nowiki-like tags and templates (same length) so category
 // links inside them are not treated as page categories (matches HotCat/VE)
 const RAW_TAGS = ['nowiki', 'pre', 'code', 'math', 'syntaxhighlight', 'source', 'timeline', 'poem', 'hiero']
+let _lastMaskedSource: string | null = null
+let _lastMasked: string | null = null
 function maskIgnoredRegions(text: string): string {
+  // Single-entry memo: parse/build steps frequently mask the same text
+  if (text === _lastMaskedSource) return _lastMasked!
   let masked = text.replace(/<!--[\s\S]*?-->/g, (m) => ' '.repeat(m.length))
   for (const tag of RAW_TAGS) {
     masked = masked.replace(
@@ -84,7 +88,10 @@ function maskIgnoredRegions(text: string): string {
       i = j - 1
     }
   }
-  return chars.join('')
+  const maskedResult = chars.join('')
+  _lastMaskedSource = text
+  _lastMasked = maskedResult
+  return maskedResult
 }
 
 let _catNsAlt: string | null = null
