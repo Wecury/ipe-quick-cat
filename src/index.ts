@@ -965,6 +965,19 @@ export default defineIPEPlugin({
       }).description('Quick Cat options'),
       'general'
     )
+    // customRegistries is public: move our section above the built-in 'language' one
+    // so it shows higher up in the General tab.
+    {
+      const regs = c.preferences?.customRegistries as { name: string }[] | undefined
+      if (regs) {
+        const self = regs.findIndex((r) => r.name === PLUGIN_NAME)
+        if (self > 0) {
+          const [section] = regs.splice(self, 1)
+          const lang = regs.findIndex((r) => r.name === 'language')
+          regs.splice(lang >= 0 ? lang : 0, 0, section)
+        }
+      }
+    }
 
     currentCtx = c
     c.on('dispose', () => {
