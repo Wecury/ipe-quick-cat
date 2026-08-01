@@ -947,16 +947,24 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
 export default defineIPEPlugin({
   name: PLUGIN_NAME,
   inject: ['toolbox', 'modal', 'wikiPage', 'api'],
-  PreferencesSchema: Schema.object({
-    'quickCat.defaultSummary': Schema.string()
-      .description('Default summary of the quick cat')
-      .default('[IPE-NEXT] Quick Cat'),
-  }).description('Quick Cat options'),
   apply(ctx: InPageEdit, config?: any): void {
     const c = ctx as Ctx
     // Prevent duplicate registration (plugin store + userscript both load)
     if ((c as any)[APPLIED_FLAG]) return
     ;(c as any)[APPLIED_FLAG] = true
+
+    // Register a Preferences UI section (default edit summary) through the custom
+    // config registry — the reliable path for store-installed plugins (same as
+    // official plugin-store / analytics / i18n do via ctx.preferences.registerCustomConfig).
+    c.preferences?.registerCustomConfig?.(
+      PLUGIN_NAME,
+      Schema.object({
+        'quickCat.defaultSummary': Schema.string()
+          .description('Default summary of the quick cat')
+          .default('[IPE-NEXT] Quick Cat'),
+      }).description('Quick Cat options'),
+      'general'
+    )
 
     currentCtx = c
     c.on('dispose', () => {
