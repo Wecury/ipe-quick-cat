@@ -859,6 +859,10 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
     return
   }
 
+  const defaultSummary = (await ctx.preferences.get('quickCat.defaultSummary')) || ''
+  const defaultMinor = !!(await ctx.preferences.get('quickCat.defaultMinor'))
+  const outSideClose = !!(await ctx.preferences.get('quickCat.outSideClose'))
+
   const m = modal
     .createObject({
       title: `${i18n('modalTitle')}: ${title}`,
@@ -868,7 +872,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
       className: 'compact-buttons',
       sizeClass: 'smallToMedium',
       center: true,
-      outSideClose: false,
+      outSideClose,
     })
     .init()
 
@@ -913,8 +917,8 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
       categories: parsed.categories,
       originalDefaultSort: parsed.defaultSort,
       defaultSort: parsed.defaultSort,
-      summary: config?.summary || (await ctx.preferences.get('quickCat.defaultSummary')) || '',
-      minor: false,
+      summary: config?.summary || defaultSummary,
+      minor: defaultMinor,
       reloadAfterSave: true,
       selected: new Set(),
       _dragIndex: null,
@@ -962,6 +966,12 @@ export default defineIPEPlugin({
         'quickCat.defaultSummary': Schema.string()
           .description('Default summary of the quick cat')
           .default('[IPE-NEXT] Quick Cat'),
+        'quickCat.defaultMinor': Schema.boolean()
+          .description('Default to checking "minor edit" option')
+          .default(false),
+        'quickCat.outSideClose': Schema.boolean()
+          .description('Close editor modal by clicking outside')
+          .default(false),
       }).description('Quick Cat options'),
       'general'
     )
