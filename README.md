@@ -45,14 +45,19 @@ clone [inpageedit/plugin-registry](https://github.com/inpageedit/plugin-registry
 
 ```
 src/
-├── index.ts   # 插件入口与 UI（defineIPEPlugin；注入 toolbox / modal / wikiPage / api）
-├── parse.ts   # wikitext 解析 / 生成（纯函数，仅依赖 mw.config）
-└── style.scss # 样式（--ipe-modal-* 主题变量，BEM 命名）
-harness/       # 独立构建外壳：defineIPEPlugin 助手 / Promise.withResolvers / 类型声明
-               #（内容与官方注册表 common/ 一致，`~~/defineIPEPlugin.js` 别名指向此处）
+├── index.ts        # 插件入口与 UI（defineIPEPlugin；注入 toolbox / modal / wikiPage / api）
+├── context.ts      # 上下文工厂：i18n（跟随 IPE 语言偏好）/ logger / 命名空间信息
+├── parse.ts        # wikitext 解析 / 生成
+├── categoryState.ts # 分类状态纯函数（选择 / 拖拽 / 删除）
+├── autocomplete.ts # 分类搜索 + 自动补全下拉
+├── dom.ts          # 元素工厂 h() + SVG 图标
+├── types.ts        # Ctx / QuickCatContext 类型
+└── style.scss      # 样式
+harness/            # 独立构建外壳：defineIPEPlugin 助手 / Promise.withResolvers / 类型声明
+                    #（内容与官方注册表 common/ 一致，`~~/defineIPEPlugin.js` 别名指向此处）
 ```
 
 - 构建：`npm run build` → `dist/index.mjs` + `dist/style.css`
 - 测试：`npm test`（解析逻辑）；类型检查：`npm run typecheck`
-- 国际化：复用官方字典（`ctx.$$`）+ 内置 en/zh 兜底 + `registerMessages`
+- 国际化：复用官方字典（`ctx.$$`）+ 内置 en/zh 兜底，语言跟随 IPE 偏好设置（`@user` / `@site` / 具体代码，`i18n/changed` 热切换）
 - 上架：已按官方 `inpageedit/plugin-registry` 包结构组织，`package.json` 的 `$ipe` 字段已配置
