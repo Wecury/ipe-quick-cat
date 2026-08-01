@@ -4,6 +4,7 @@ import {
   buildWikitext,
   getCategoryNamespaceAlt,
   getCategoryNamespaceName,
+  initCategoryNsInfo,
   isUnchanged,
   parseCategories,
   stripCategoryPrefix,
@@ -22,6 +23,9 @@ const mwMock = {
 }
 globalThis.mw = mwMock
 globalThis.window = { mw: mwMock }
+
+// 命名空间信息：创建一次并显式传给解析/生成函数（无隐藏全局状态）
+const NS = initCategoryNsInfo()
 
 // 提取内容字段（忽略 _id/start/end 等位置信息）
 const catsPlain = (cats) => cats.map((c) => ({ ns: c.ns, name: c.name, sortkey: c.sortkey }))
@@ -44,7 +48,7 @@ assertEq('本地化前缀集合', getCategoryNamespaceAlt(), 'Category|category|
 assertEq('站点规范命名空间名', getCategoryNamespaceName(), '分类')
 
 // ---- 解析（含位置 _id/start/end）----
-let parsed = parseCategories('Hello\n[[Category:Foo]]\n[[分类:中文类]]\n[[分類:繁中|排序]]\n[[:分类:仅展示]]\n')
+let parsed = parseCategories('Hello\n[[Category:Foo]]\n[[分类:中文类]]\n[[分類:繁中|排序]]\n[[:分类:仅展示]]\n', NS)
 assertEq(
   '解析英文/本地化分类(含ns)',
   JSON.stringify(catsPlain(parsed.categories)),
@@ -60,7 +64,8 @@ assertEq('位置递增且不重叠', parsed.categories.every((c, i, arr) => i ==
 
 // 注释 / 模板 / nowiki 内的分类链接不视为页面分类
 parsed = parseCategories(
-  'A\n<!-- [[Category:InComment]] -->\n{{Navbox|[[Category:InTemplate]]}}\n<nowiki>[[Category:InNowiki]]</nowiki>\n[[分类:Real]]\n'
+  'A\n<!-- [[Category:InComment]] -->\n{{Navbox|[[Category:InTemplate]]}}\n<nowiki>[[Category:InNowiki]]</nowiki>\n[[分类:Real]]\n',
+  NS
 )
 assertEq(
   '忽略注释/模板/nowiki内分类',
@@ -68,7 +73,7 @@ assertEq(
   JSON.stringify([{ ns: '分类', name: 'Real', sortkey: '' }])
 )
 
-parsed = parseCategories('{{DEFAULTSORT:{{PAGENAME}}}}\n[[Category:X | sk ]]')
+parsed = parseCategories('{{DEFAULTSORT:{{PAGENAME}}}}\n[[Category:X | sk ]]', NS)
 assertEq('嵌套模板 DEFAULTSORT', parsed.defaultSort, '{{PAGENAME}}')
 assertEq(
   '分类名/排序键 trim',
@@ -77,14 +82,14 @@ assertEq(
 )
 
 // ---- 前缀剥离 ----
-assertEq('剥离英文前缀', stripCategoryPrefix('Category:Foo'), 'Foo')
-assertEq('剥离简体前缀', stripCategoryPrefix('分类:中文类'), '中文类')
-assertEq('剥离繁体前缀', stripCategoryPrefix('分類:繁中'), '繁中')
-assertEq('剥离无前缀', stripCategoryPrefix('普通类'), '普通类')
+assertEq('剥离英文前缀', stripCategoryPrefix('Category:Foo', NS), 'Foo')
+assertEq('剥离简体前缀', stripCategoryPrefix('分类:中文类', NS), '中文类')
+assertEq('剥离繁体前缀', stripCategoryPrefix('分類:繁中', NS), '繁中')
+assertEq('剥离无前缀', stripCategoryPrefix('普通类', NS), '普通类')
 
 // ============ 生成：原位更新（HotCat 风格） ============
 const CONTENT = 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
-const CATS = parseCategories(CONTENT).categories // _id1=分类:Foo, _id2=Category:Bar
+const CATS = parseCategories(CONTENT, NS).categories // _id1=分类:Foo, _id2=Category:Bar
 
 // 只改 Foo 的排序键 -> Foo 原位更新，Bar 原地不动
 let out = buildWikitext(
@@ -94,17 +99,18 @@ let out = buildWikitext(
     { _id: 2, name: 'Bar', sortkey: 'b', ns: 'Category' },
   ],
   '',
-  CATS
+  CATS,
+  NS
 )
 assertEq('修改排序键(原位, Bar不变)', out, 'A\n[[分类:Foo|k]]\n[[Category:Bar|b]]\n')
 
 // 删除 Bar -> 原位删除，Foo 不动
-out = buildWikitext(CONTENT, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS)
+out = buildWikitext(CONTENT, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS, NS)
 assertEq('删除分类(原位删除, Foo不动)', out, 'A\n[[分类:Foo]]\n')
 
 // 删除分类：若独占一行则连行删除，不留空行
 const CONTENT_DEL = '[[分类:1]]\n[[分类:2]]\n[[分类:3]]\n'
-const CATS_DEL = parseCategories(CONTENT_DEL).categories // 1,2,3
+const CATS_DEL = parseCategories(CONTENT_DEL, NS).categories // 1,2,3
 out = buildWikitext(
   CONTENT_DEL,
   [
@@ -112,18 +118,20 @@ out = buildWikitext(
     { _id: 3, name: '3', sortkey: '', ns: '分类' },
   ],
   '',
-  CATS_DEL
+  CATS_DEL,
+  NS
 )
 assertEq('删除分类(整行删除不留空行)', out, '[[分类:1]]\n[[分类:3]]\n')
 
 // 删除分类时不折叠正文中与分类无关的多空行（修复激进规范化）
 const CONTENT_SP = 'Lead.\n\n\n\n[[分类:1]]\n[[分类:2]]\n'
-const CATS_SP = parseCategories(CONTENT_SP).categories // 1,2
+const CATS_SP = parseCategories(CONTENT_SP, NS).categories // 1,2
 out = buildWikitext(
   CONTENT_SP,
   [{ _id: 1, name: '1', sortkey: '', ns: '分类' }],
   '',
-  CATS_SP
+  CATS_SP,
+  NS
 )
 assertEq('删除分类保留正文多空行', out, 'Lead.\n\n\n\n[[分类:1]]\n')
 
@@ -136,13 +144,14 @@ out = buildWikitext(
     { name: 'New', sortkey: '', ns: null },
   ],
   '',
-  CATS
+  CATS,
+  NS
 )
 assertEq('新增分类(追加末尾)', out, 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n[[分类:New]]\n')
 
 // 新增分类：分类不在末尾时，紧跟最后一个分类链接（HotCat 风格），而非页尾
 const CONTENT_MID = 'Lead paragraph.\n[[分类:Foo]]\nTail paragraph.\n'
-const CATS_MID = parseCategories(CONTENT_MID).categories
+const CATS_MID = parseCategories(CONTENT_MID, NS).categories
 out = buildWikitext(
   CONTENT_MID,
   [
@@ -150,7 +159,8 @@ out = buildWikitext(
     { name: 'New', sortkey: '', ns: null },
   ],
   '',
-  CATS_MID
+  CATS_MID,
+  NS
 )
 assertEq(
   '新增分类(紧跟已有分类, 不落页尾)',
@@ -160,23 +170,23 @@ assertEq(
 
 // DEFAULTSORT 原位更新
 const CONTENT2 = 'X\n{{DEFAULTSORT:D}}\n[[分类:Foo]]\n'
-const CATS2 = parseCategories(CONTENT2).categories
-out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: 'E', ns: '分类' }], 'E', CATS2)
+const CATS2 = parseCategories(CONTENT2, NS).categories
+out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: 'E', ns: '分类' }], 'E', CATS2, NS)
 assertEq('DEFAULTSORT 原位更新', out, 'X\n{{DEFAULTSORT:E}}\n[[分类:Foo]]\n')
 
 // 清空默认排序键（配合 UI：继承默认键的行排序键已一并清空）-> 不产生冗余显式 |D
-out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS2)
+out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS2, NS)
 assertEq('清空默认排序键(无冗余显式键)', out, 'X\n\n[[分类:Foo]]\n')
 
 // 前导空格（preformatted 语义）在重排/更新时保留，不 trim 掉
 const CONTENT_PF = '  preformatted\n[[分类:Foo]]\n'
-const CATS_PF = parseCategories(CONTENT_PF).categories
-out = buildWikitext(CONTENT_PF, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS_PF)
+const CATS_PF = parseCategories(CONTENT_PF, NS).categories
+out = buildWikitext(CONTENT_PF, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS_PF, NS)
 assertEq('保留preformatted前导空格', out, '  preformatted\n[[分类:Foo]]\n')
 
 // ============ 生成：拖动重排 -> 整体重建末尾 ============
 const CONTENT3 = 'A\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
-const CATS3 = parseCategories(CONTENT3).categories // _id1=Bar, _id2=Foo
+const CATS3 = parseCategories(CONTENT3, NS).categories // _id1=Bar, _id2=Foo
 out = buildWikitext(
   CONTENT3,
   [
@@ -184,13 +194,14 @@ out = buildWikitext(
     { _id: 1, name: 'Bar', sortkey: 'b', ns: 'Category' },
   ],
   '',
-  CATS3
+  CATS3,
+  NS
 )
 assertEq('拖动重排(整体重建末尾)', out, 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n')
 
 // 拖动重排时保留注释/模板内的分类链接（不被当作页面分类删除）
 const CONTENT_IGN = 'A\n<!-- [[Category:Keep]] -->\n{{T|[[Category:InT]]}}\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
-const CATS_IGN = parseCategories(CONTENT_IGN).categories // 只有 Bar, Foo
+const CATS_IGN = parseCategories(CONTENT_IGN, NS).categories // 只有 Bar, Foo
 out = buildWikitext(
   CONTENT_IGN,
   [
@@ -198,7 +209,8 @@ out = buildWikitext(
     { _id: 1, name: 'Bar', sortkey: 'b', ns: 'Category' },
   ],
   '',
-  CATS_IGN
+  CATS_IGN,
+  NS
 )
 assertEq(
   '重排保留注释/模板内分类',
@@ -208,7 +220,7 @@ assertEq(
 
 // 注释/模板内的 DEFAULTSORT 在重排时保留（与解析一致）
 const CONTENT_DS_IGN = 'A\n<!-- {{DEFAULTSORT:Hidden}} -->\n{{DEFAULTSORT:Real}}\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
-const CATS_DS_IGN = parseCategories(CONTENT_DS_IGN).categories // 只有 Foo, Bar
+const CATS_DS_IGN = parseCategories(CONTENT_DS_IGN, NS).categories // 只有 Foo, Bar
 out = buildWikitext(
   CONTENT_DS_IGN,
   [
@@ -216,7 +228,8 @@ out = buildWikitext(
     { _id: 1, name: 'Foo', sortkey: '', ns: '分类' },
   ],
   'New',
-  CATS_DS_IGN
+  CATS_DS_IGN,
+  NS
 )
 assertEq(
   '重排保留注释/模板内DEFAULTSORT',
@@ -226,7 +239,7 @@ assertEq(
 
 // 分类写在章节中间时，拖拽重排保留在原位置（不落到页面底部）
 const CONTENT_SEC = '==章节一==\n[[分类:A]]\n[[分类:B]]\n==章节二==\n'
-const CATS_SEC = parseCategories(CONTENT_SEC).categories // A, B
+const CATS_SEC = parseCategories(CONTENT_SEC, NS).categories // A, B
 out = buildWikitext(
   CONTENT_SEC,
   [
@@ -234,13 +247,14 @@ out = buildWikitext(
     { _id: 1, name: 'A', sortkey: '', ns: '分类' },
   ],
   '',
-  CATS_SEC
+  CATS_SEC,
+  NS
 )
 assertEq('重排分类保留在章节内', out, '==章节一==\n[[分类:B]]\n[[分类:A]]\n==章节二==\n')
 
 // 分类分散在不同章节时，重排回退到末尾重建，但保留所有正文（不误删）
 const CONTENT_DISP = '==甲==\n[[分类:A]]\n==乙==\n[[分类:B]]\n'
-const CATS_DISP = parseCategories(CONTENT_DISP).categories // A, B
+const CATS_DISP = parseCategories(CONTENT_DISP, NS).categories // A, B
 out = buildWikitext(
   CONTENT_DISP,
   [
@@ -248,9 +262,26 @@ out = buildWikitext(
     { _id: 1, name: 'A', sortkey: '', ns: '分类' },
   ],
   '',
-  CATS_DISP
+  CATS_DISP,
+  NS
 )
 assertEq('分散分类重排保留正文', out, '==甲==\n==乙==\n[[分类:B]]\n[[分类:A]]\n')
+
+// 新增分类被拖到已有分类之前时，保存要保留其新位置（HotCat 原位插入做不到）
+const CONTENT_NEW = 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
+const CATS_NEW = parseCategories(CONTENT_NEW, NS).categories // Foo(1), Bar(2)
+out = buildWikitext(
+  CONTENT_NEW,
+  [
+    { name: 'New', sortkey: '', ns: null },
+    { _id: 1, name: 'Foo', sortkey: '', ns: '分类' },
+    { _id: 2, name: 'Bar', sortkey: 'b', ns: 'Category' },
+  ],
+  '',
+  CATS_NEW,
+  NS
+)
+assertEq('新增分类拖到最前(重建保留位置)', out, 'A\n[[分类:New]]\n[[分类:Foo]]\n[[Category:Bar|b]]\n')
 
 // ============ isUnchanged ============
 let state = {
@@ -260,10 +291,10 @@ let state = {
   defaultSort: '',
   rows: CATS.map((c) => ({ _id: c._id, name: c.name, sortkey: c.sortkey || '', ns: c.ns })),
 }
-assertEq('未改动 -> unchanged', isUnchanged(state), true)
+assertEq('未改动 -> unchanged', isUnchanged(state, NS), true)
 
 state.rows[0].sortkey = 'k'
-assertEq('改排序键 -> changed', isUnchanged(state), false)
+assertEq('改排序键 -> changed', isUnchanged(state, NS), false)
 
 state = {
   content: CONTENT3,
@@ -272,7 +303,7 @@ state = {
   defaultSort: '',
   rows: CATS3.map((c) => ({ _id: c._id, name: c.name, sortkey: c.sortkey || '', ns: c.ns })),
 }
-assertEq('未拖动顺序不变 -> unchanged', isUnchanged(state), true)
+assertEq('未拖动顺序不变 -> unchanged', isUnchanged(state, NS), true)
 
 if (failures === 0) console.log('\n全部通过 ✅')
 else {
