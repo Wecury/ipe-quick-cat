@@ -490,6 +490,17 @@ function createCategoryRow(
 ): HTMLElement {
   const rowEl = h('div', { class: 'ipe-quick-cat__row' })
 
+  const check = h('input', {
+    class: 'ipe-quick-cat__check',
+    type: 'checkbox',
+    checked: state.selected.has(row),
+  }) as HTMLInputElement
+  check.addEventListener('change', () => {
+    if (check.checked) state.selected.add(row)
+    else state.selected.delete(row)
+    refreshToolbar()
+  })
+
   const grip = h(
     'span',
     { class: 'ipe-quick-cat__grip', title: i18n('drag'), 'aria-label': i18n('drag') },
@@ -507,21 +518,6 @@ function createCategoryRow(
       el.classList.remove('is-drop-before', 'is-drop-after')
     )
     state._dragIndex = null
-  })
-
-  const check = h('input', {
-    class: 'ipe-quick-cat__check',
-    type: 'checkbox',
-    checked: state.selected.has(row),
-  }) as HTMLInputElement
-  check.addEventListener('change', () => {
-    if (check.checked) state.selected.add(row)
-    else state.selected.delete(row)
-    list.querySelectorAll('.ipe-quick-cat__row').forEach((el, i) => {
-      const cb = el.querySelector('.ipe-quick-cat__check') as HTMLInputElement | null
-      if (cb) cb.checked = state.selected.has(state.rows[i])
-    })
-    refreshToolbar()
   })
 
   const nameInput = h('input', {
