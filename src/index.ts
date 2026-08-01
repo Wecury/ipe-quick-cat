@@ -494,18 +494,13 @@ function createCategoryRow(
     { class: 'ipe-quick-cat__grip', title: i18n('drag'), 'aria-label': i18n('drag') },
     '⠿'
   )
-  grip.draggable = true
-  grip.addEventListener('dragstart', (e) => {
+  // Pointer events drive the drag on both mouse and touch (HTML5 DnD has no touch support)
+  grip.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    e.preventDefault()
     state._dragIndex = state.rows.indexOf(row)
-    e.dataTransfer!.effectAllowed = 'move'
+    grip.setPointerCapture(e.pointerId)
     rowEl.classList.add('is-dragging')
-  })
-  grip.addEventListener('dragend', () => {
-    rowEl.classList.remove('is-dragging')
-    list.querySelectorAll('.ipe-quick-cat__row').forEach((el) =>
-      el.classList.remove('is-drop-before', 'is-drop-after')
-    )
-    state._dragIndex = null
   })
 
   const nameInput = h('input', {
@@ -627,23 +622,20 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
       el.classList.remove('is-drop-before', 'is-drop-after')
     )
   }
-  list.addEventListener('dragover', (e) => {
+  list.addEventListener('pointermove', (e) => {
     if (state._dragIndex == null) return
     e.preventDefault()
-    e.dataTransfer!.dropEffect = 'move'
+    // Auto-scroll when the pointer nears the list edges
+    const rect = list.getBoundingClientRect()
+    if (e.clientY < rect.top + 32) list.scrollTop -= 8
+    else if (e.clientY > rect.bottom - 32) list.scrollTop += 8
     clearIndicators()
     const idx = computeInsertIndex(e.clientY)
     const rows = [...list.querySelectorAll('.ipe-quick-cat__row')]
     if (idx < rows.length) rows[idx].classList.add('is-drop-before')
     else if (rows.length) rows[rows.length - 1].classList.add('is-drop-after')
   })
-  list.addEventListener('dragleave', (e) => {
-    const rt = e.relatedTarget
-    if (!(rt instanceof Node) || !list.contains(rt)) clearIndicators()
-  })
-  list.addEventListener('drop', (e) => {
-    e.preventDefault()
-    clearIndicators()
+  list.addEventListener('pointerup', (e) => {
     if (state._dragIndex == null) return
     const from = state._dragIndex
     const to = computeInsertIndex(e.clientY)
@@ -652,6 +644,12 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     state.rows.splice(target, 0, moved)
     state._dragIndex = null
     refreshList()
+  })
+  list.addEventListener('pointercancel', () => {
+    state._dragIndex = null
+    list.querySelectorAll('.ipe-quick-cat__row').forEach((el) =>
+      el.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after')
+    )
   })
 
   selectAll.addEventListener('change', () => {

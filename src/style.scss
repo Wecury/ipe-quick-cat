@@ -19,7 +19,8 @@
 .ipe-quick-cat__row.is-drop-before { box-shadow:0 -2px 0 0 var(--ipe-modal-accent); }
 .ipe-quick-cat__row.is-drop-after { box-shadow:0 2px 0 0 var(--ipe-modal-accent); }
 .ipe-quick-cat__grip {
-  flex:none; cursor:grab; user-select:none; font-size:1.05rem; line-height:1;
+  flex:none; cursor:grab; user-select:none; touch-action:none; -webkit-touch-callout:none;
+  font-size:1.05rem; line-height:1;
   color:var(--ipe-modal-muted); padding:4px 2px;
 }
 .ipe-quick-cat__grip:active { cursor:grabbing; }
