@@ -102,6 +102,20 @@ assertEq('修改排序键(原位, Bar不变)', out, 'A\n[[分类:Foo|k]]\n[[Cate
 out = buildWikitext(CONTENT, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS)
 assertEq('删除分类(原位删除, Foo不动)', out, 'A\n[[分类:Foo]]\n')
 
+// 删除分类：若独占一行则连行删除，不留空行
+const CONTENT_DEL = '[[分类:1]]\n[[分类:2]]\n[[分类:3]]\n'
+const CATS_DEL = parseCategories(CONTENT_DEL).categories // 1,2,3
+out = buildWikitext(
+  CONTENT_DEL,
+  [
+    { _id: 1, name: '1', sortkey: '', ns: '分类' },
+    { _id: 3, name: '3', sortkey: '', ns: '分类' },
+  ],
+  '',
+  CATS_DEL
+)
+assertEq('删除分类(整行删除不留空行)', out, '[[分类:1]]\n[[分类:3]]\n')
+
 // 新增分类 -> 追加到末尾，已有分类位置不变
 out = buildWikitext(
   CONTENT,

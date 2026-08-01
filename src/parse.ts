@@ -280,7 +280,22 @@ export function buildInPlace(
   for (const c of originalCats) {
     const row = rowById.get(c._id)
     const link = row ? (renderLink(row, defaultSort, defaultNs) ?? '') : ''
-    edits.push({ start: c.start, end: c.end, text: link })
+    let start = c.start
+    let end = c.end
+    if (!link) {
+      // A deleted category that owns its line also removes the surrounding
+      // indentation and newline so no blank line is left behind
+      const lineStart = original.lastIndexOf('\n', c.start - 1) + 1
+      const lineEndRel = original.indexOf('\n', c.end)
+      const lineEnd = lineEndRel === -1 ? original.length : lineEndRel
+      const before = original.slice(lineStart, c.start)
+      const after = original.slice(c.end, lineEnd)
+      if (/^[ \t]*$/.test(before) && /^[ \t]*$/.test(after)) {
+        start = lineStart
+        end = lineEnd < original.length ? lineEnd + 1 : lineEnd
+      }
+    }
+    edits.push({ start, end, text: link })
   }
   for (const m of dsMatches) {
     edits.push({

@@ -78,6 +78,8 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     minorEdit: '小编辑',
     reloadAfterSave: '保存后刷新页面',
     notEditable: '当前页面不可编辑，无法修改分类。',
+    conflict: '编辑冲突',
+    conflictDesc: '页面已被其他人修改，请刷新后重试，避免覆盖他人的更改。',
   },
   en: {
     tooltip: 'Quick Cat',
@@ -111,6 +113,8 @@ const I18N: Record<'zh' | 'en', Record<string, string>> = {
     minorEdit: 'Minor edit',
     reloadAfterSave: 'Reload page after saving',
     notEditable: 'This page is not editable.',
+    conflict: 'Edit conflict',
+    conflictDesc: 'The page was modified by someone else. Reload and try again to avoid overwriting.',
   },
 }
 
@@ -866,6 +870,8 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
       text: newText,
       summary: state.summary || i18n('summaryDefault'),
       minor: state.minor,
+      // Explicit revid for precise conflict detection (basetimestamp is second-granular)
+      baserevid: state.page.lastrevid,
     })
     if (!m.isDestroyed) m.close()
     if (state.reloadAfterSave) {
@@ -884,7 +890,16 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
     }
   } catch (err) {
     log.error('save failed:', err)
-    modal.notify('error', { title: i18n('saveFailed'), content: String((err as Error)?.message || err) })
+    const code = (err as any)?.code || (err as any)?.data?.error?.code
+    if (code === 'editconflict') {
+      modal.notify('warning', {
+        title: i18n('conflict'),
+        content: i18n('conflictDesc'),
+        closeAfter: 10000,
+      })
+    } else {
+      modal.notify('error', { title: i18n('saveFailed'), content: String((err as Error)?.message || err) })
+    }
   } finally {
     if (!m.isDestroyed) m.setLoadingState(false)
   }
