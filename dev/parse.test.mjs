@@ -58,6 +58,16 @@ assertEq('忽略展示链接', parsed.categories.length, 3)
 assertEq('_id 连续', JSON.stringify(parsed.categories.map((c) => c._id)), '[1,2,3]')
 assertEq('位置递增且不重叠', parsed.categories.every((c, i, arr) => i === 0 || c.start > arr[i - 1].end), true)
 
+// 注释 / 模板 / nowiki 内的分类链接不视为页面分类
+parsed = parseCategories(
+  'A\n<!-- [[Category:InComment]] -->\n{{Navbox|[[Category:InTemplate]]}}\n<nowiki>[[Category:InNowiki]]</nowiki>\n[[分类:Real]]\n'
+)
+assertEq(
+  '忽略注释/模板/nowiki内分类',
+  JSON.stringify(catsPlain(parsed.categories)),
+  JSON.stringify([{ ns: '分类', name: 'Real', sortkey: '' }])
+)
+
 parsed = parseCategories('{{DEFAULTSORT:{{PAGENAME}}}}\n[[Category:X | sk ]]')
 assertEq('嵌套模板 DEFAULTSORT', parsed.defaultSort, '{{PAGENAME}}')
 assertEq(
@@ -129,6 +139,10 @@ const CATS2 = parseCategories(CONTENT2).categories
 out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: 'E', ns: '分类' }], 'E', CATS2)
 assertEq('DEFAULTSORT 原位更新', out, 'X\n{{DEFAULTSORT:E}}\n[[分类:Foo]]\n')
 
+// 清空默认排序键（配合 UI：继承默认键的行排序键已一并清空）-> 不产生冗余显式 |D
+out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS2)
+assertEq('清空默认排序键(无冗余显式键)', out, 'X\n\n[[分类:Foo]]\n')
+
 // ============ 生成：拖动重排 -> 整体重建末尾 ============
 const CONTENT3 = 'A\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
 const CATS3 = parseCategories(CONTENT3).categories // _id1=Bar, _id2=Foo
@@ -142,6 +156,24 @@ out = buildWikitext(
   CATS3
 )
 assertEq('拖动重排(整体重建末尾)', out, 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n')
+
+// 拖动重排时保留注释/模板内的分类链接（不被当作页面分类删除）
+const CONTENT_IGN = 'A\n<!-- [[Category:Keep]] -->\n{{T|[[Category:InT]]}}\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
+const CATS_IGN = parseCategories(CONTENT_IGN).categories // 只有 Bar, Foo
+out = buildWikitext(
+  CONTENT_IGN,
+  [
+    { _id: 2, name: 'Foo', sortkey: '', ns: '分类' },
+    { _id: 1, name: 'Bar', sortkey: 'b', ns: 'Category' },
+  ],
+  '',
+  CATS_IGN
+)
+assertEq(
+  '重排保留注释/模板内分类',
+  out,
+  'A\n<!-- [[Category:Keep]] -->\n{{T|[[Category:InT]]}}\n[[分类:Foo]]\n[[Category:Bar|b]]\n'
+)
 
 // ============ isUnchanged ============
 let state = {

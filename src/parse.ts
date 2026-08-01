@@ -29,6 +29,64 @@ export function escapeRegExp(str: string): string {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Blank out comments, nowiki-like tags and templates (same length) so category
+// links inside them are not treated as page categories (matches HotCat/VE)
+const RAW_TAGS = ['nowiki', 'pre', 'code', 'math', 'syntaxhighlight', 'source', 'timeline', 'poem', 'hiero']
+function maskIgnoredRegions(text: string): string {
+  let masked = text.replace(/<!--[\s\S]*?-->/g, (m) => ' '.repeat(m.length))
+  for (const tag of RAW_TAGS) {
+    masked = masked.replace(
+      new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>`, 'gi'),
+      (m) => ' '.repeat(m.length)
+    )
+  }
+  // Templates (nested {{ ... }}), but keep the DEFAULTSORT magic word itself
+  const chars = masked.split('')
+  for (let i = 0; i < chars.length; i++) {
+    if (!masked.startsWith('{{', i)) continue
+    let k = i + 2
+    while (k < masked.length && /\s/.test(masked[k])) k++
+    const rest = masked.slice(k).toLowerCase()
+    const isDefaultSort = rest.startsWith('defaultsort:') || rest.startsWith('defaultsortkey:')
+    if (isDefaultSort) {
+      // Skip past this magic word so its {{value}} stays intact
+      let depth = 1
+      let j = i + 2
+      while (j < masked.length && depth > 0) {
+        if (masked.startsWith('{{', j)) {
+          depth++
+          j += 2
+        } else if (masked.startsWith('}}', j)) {
+          depth--
+          j += 2
+        } else {
+          j++
+        }
+      }
+      if (depth === 0) i = j - 1
+      continue
+    }
+    let depth = 1
+    let j = i + 2
+    while (j < masked.length && depth > 0) {
+      if (masked.startsWith('{{', j)) {
+        depth++
+        j += 2
+      } else if (masked.startsWith('}}', j)) {
+        depth--
+        j += 2
+      } else {
+        j++
+      }
+    }
+    if (depth === 0) {
+      for (let k2 = i; k2 < j; k2++) chars[k2] = ' '
+      i = j - 1
+    }
+  }
+  return chars.join('')
+}
+
 let _catNsAlt: string | null = null
 
 // Localized category namespace aliases (e.g. Category / 分类 / 分類)
@@ -72,16 +130,17 @@ export function stripCategoryPrefix(name: string): string {
 
 export function findDefaultSortMatches(text: string): DefaultSortMatch[] {
   const matches: DefaultSortMatch[] = []
+  const masked = maskIgnoredRegions(text)
   const re = /\{\{\s*(?:DEFAULTSORT|DEFAULTSORTKEY)\s*:\s*/gi
   let m: RegExpExecArray | null
-  while ((m = re.exec(text))) {
+  while ((m = re.exec(masked))) {
     let i = re.lastIndex
     let depth = 1
-    while (i < text.length && depth > 0) {
-      if (text.startsWith('{{', i)) {
+    while (i < masked.length && depth > 0) {
+      if (masked.startsWith('{{', i)) {
         depth++
         i += 2
-      } else if (text.startsWith('}}', i)) {
+      } else if (masked.startsWith('}}', i)) {
         depth--
         i += 2
       } else {
@@ -95,7 +154,8 @@ export function findDefaultSortMatches(text: string): DefaultSortMatch[] {
   return matches
 }
 
-// Exclude display links such as [[:Category:...]]
+// Exclude display links such as [[:Category:...]] and ignored regions
+// (comments / nowiki / templates)
 export function parseCategories(wikitext: string): Parsed {
   const categories: CategoryRef[] = []
   const ds = findDefaultSortMatches(wikitext)
@@ -104,9 +164,10 @@ export function parseCategories(wikitext: string): Parsed {
     `\\[\\[\\s*(?<ns>${alt})\\s*:\\s*(?<name>[^\\[\\]|]*?)(?:\\s*\\|\\s*(?<sortkey>[^\\[\\]]*?))?\\s*\\]\\]`,
     'gi'
   )
+  const masked = maskIgnoredRegions(wikitext)
   let m: RegExpExecArray | null
   let nextId = 1
-  while ((m = re.exec(wikitext))) {
+  while ((m = re.exec(masked))) {
     categories.push({
       _id: nextId++,
       ns: m.groups!.ns.trim(),
@@ -130,11 +191,28 @@ export function stripDefaultSort(text: string): string {
 
 export function stripCategoryLinks(text: string): string {
   const alt = getCategoryNamespaceAlt()
-  let out = text.replace(
-    new RegExp(`^[ \\t]*\\[\\[\\s*(?:${alt})\\s*:[^\\]]*\\]\\][ \\t]*\\r?\\n?`, 'gim'),
-    ''
-  )
-  out = out.replace(new RegExp(`\\[\\[\\s*(?:${alt})\\s*:[^\\]]*\\]\\]`, 'gi'), '')
+  const re = new RegExp(`\\[\\[\\s*(?:${alt})\\s*:[^\\]]*\\]\\]`, 'gi')
+  const masked = maskIgnoredRegions(text)
+  const ranges: Array<[number, number]> = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(masked))) ranges.push([m.index, m.index + m[0].length])
+
+  let out = text
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    let [s, e] = ranges[i]
+    // A link leading a line also drops its indentation and trailing newline
+    let lead = s
+    while (lead > 0 && (out[lead - 1] === ' ' || out[lead - 1] === '\t')) lead--
+    if (lead === 0 || out[lead - 1] === '\n') {
+      s = lead
+      let t = e
+      while (t < out.length && (out[t] === ' ' || out[t] === '\t')) t++
+      if (out[t] === '\r') t++
+      if (out[t] === '\n') t++
+      e = t
+    }
+    out = out.slice(0, s) + out.slice(e)
+  }
   return out
 }
 
@@ -175,9 +253,10 @@ function findLastCategoryEnd(text: string): number {
     `\\[\\[\\s*(?:${alt})\\s*:\\s*[^\\[\\]|]*?(?:\\s*\\|\\s*[^\\[\\]]*?)?\\s*\\]\\]`,
     'gi'
   )
+  const masked = maskIgnoredRegions(text)
   let end = -1
   let m: RegExpExecArray | null
-  while ((m = re.exec(text))) end = m.index + m[0].length
+  while ((m = re.exec(masked))) end = m.index + m[0].length
   return end
 }
 
@@ -194,23 +273,26 @@ export function buildInPlace(
   for (const r of rows) if (r._id != null) rowById.set(r._id, r)
   const additions = rows.filter((r) => r._id == null)
 
-  let text = original
-
-  // Update/remove DEFAULTSORT in place
-  const dsMatches = findDefaultSortMatches(text)
-  for (let i = dsMatches.length - 1; i >= 0; i--) {
-    const m = dsMatches[i]
-    const fullEnd = m.end + 2 // skip the closing }}
-    text =
-      text.slice(0, m.start) + (defaultSort ? `{{DEFAULTSORT:${defaultSort}}}` : '') + text.slice(fullEnd)
-  }
-
-  // Update/delete categories in place (reverse order keeps offsets valid)
-  const ordered = [...originalCats].sort((a, b) => b.start - a.start)
-  for (const c of ordered) {
+  // Collect all in-place replacements (categories + DEFAULTSORT) and apply them
+  // from the end so offsets stay valid even when edits change text length
+  const dsMatches = findDefaultSortMatches(original)
+  const edits: Array<{ start: number; end: number; text: string }> = []
+  for (const c of originalCats) {
     const row = rowById.get(c._id)
-    const link = row ? renderLink(row, defaultSort, defaultNs) : null
-    text = text.slice(0, c.start) + (link ?? '') + text.slice(c.end)
+    const link = row ? (renderLink(row, defaultSort, defaultNs) ?? '') : ''
+    edits.push({ start: c.start, end: c.end, text: link })
+  }
+  for (const m of dsMatches) {
+    edits.push({
+      start: m.start,
+      end: m.end + 2, // skip the closing }}
+      text: defaultSort ? `{{DEFAULTSORT:${defaultSort}}}` : '',
+    })
+  }
+  edits.sort((a, b) => b.start - a.start)
+  let text = original
+  for (const e of edits) {
+    text = text.slice(0, e.start) + e.text + text.slice(e.end)
   }
   text = text.replace(/\n{3,}/g, '\n\n').trim()
 

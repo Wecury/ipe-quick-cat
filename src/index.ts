@@ -24,7 +24,6 @@ const log = {
 type Ctx = InPageEdit & {
   $$: (strings: TemplateStringsArray, ...args: unknown[]) => string
   api: any
-  i18n?: { registerMessages?: (lang: string, msgs: Record<string, string>, options?: unknown) => void }
   currentPage?: any
   modal: any
   wikiPage: any
@@ -145,16 +144,6 @@ function i18n(key: string, ...args: (string | number)[]): string {
   }
   const table = String(lang).toLowerCase().startsWith('zh') ? I18N.zh : I18N.en
   return interpolateMsg(table[key] ?? I18N.en[key] ?? key)
-}
-
-function registerPluginI18n(ctx: Ctx): void {
-  if (!ctx.i18n?.registerMessages) return
-  try {
-    ctx.i18n.registerMessages('en', { ...I18N.en }, { namespace: 'quickCat' })
-    ctx.i18n.registerMessages('zh', { ...I18N.zh }, { namespace: 'quickCat' })
-  } catch (e) {
-    log.warn('registerMessages failed:', e)
-  }
 }
 
 function h(
@@ -720,12 +709,12 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
     const oldDs = state.defaultSort
     const newDs = dsInput.value.trim()
     state.defaultSort = newDs
-    // Rows matching the old default sort follow the new one (VE behavior)
-    if (oldDs && newDs && oldDs.toLowerCase() !== newDs.toLowerCase()) {
+    // Rows inheriting the old default sort follow the new one (VE behavior);
+    // clearing the default sort also clears those inherited sort keys
+    if (oldDs && oldDs.toLowerCase() !== newDs.toLowerCase()) {
+      const sameKey = (k: string) => !!k && k.toLowerCase() === oldDs.toLowerCase()
       state.rows.forEach((row) => {
-        if (row.sortkey && row.sortkey.toLowerCase() === oldDs.toLowerCase()) {
-          row.sortkey = newDs
-        }
+        if (sameKey(row.sortkey)) row.sortkey = newDs
       })
       list.querySelectorAll('.ipe-quick-cat__row').forEach((rowEl, idx) => {
         const row = state.rows[idx]
@@ -824,7 +813,7 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
     await state.page.edit({
       text: newText,
       summary: state.summary || i18n('summaryDefault'),
-      minor: state.minor ? 1 : 0,
+      minor: state.minor,
     })
     if (!m.isDestroyed) m.close()
     if (state.reloadAfterSave) {
@@ -849,7 +838,7 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
   }
 }
 
-async function showModal(ctx: Ctx, config: any): Promise<any> {
+async function showModal(ctx: Ctx): Promise<any> {
   const { modal } = ctx
   const title =
     ctx.currentPage?.wikiTitle?.getPrefixedText?.() ||
@@ -917,7 +906,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
       categories: parsed.categories,
       originalDefaultSort: parsed.defaultSort,
       defaultSort: parsed.defaultSort,
-      summary: config?.summary || defaultSummary,
+      summary: defaultSummary,
       minor: defaultMinor,
       reloadAfterSave: true,
       selected: new Set(),
@@ -951,7 +940,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
 export default defineIPEPlugin({
   name: PLUGIN_NAME,
   inject: ['toolbox', 'modal', 'wikiPage', 'api'],
-  apply(ctx: InPageEdit, config?: any): void {
+  apply(ctx: InPageEdit): void {
     const c = ctx as Ctx
     // Prevent duplicate registration (plugin store + userscript both load)
     if ((c as any)[APPLIED_FLAG]) return
@@ -979,8 +968,6 @@ export default defineIPEPlugin({
       if (currentCtx === c) currentCtx = null
     })
 
-    registerPluginI18n(c)
-
     let action = 'view'
     try {
       action = c.currentPage?.wikiAction || (mw.config.get('wgAction') as string) || 'view'
@@ -1003,7 +990,7 @@ export default defineIPEPlugin({
       onClick: (e) => {
         e.preventDefault()
         if (!canEdit) return
-        void showModal(c, config || {})
+        void showModal(c)
       },
     })
     c.on('dispose', () => {
