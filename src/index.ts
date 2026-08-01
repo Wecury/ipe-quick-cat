@@ -1,6 +1,13 @@
 import './style.scss'
 
-import { Schema, type InPageEdit } from '@inpageedit/core'
+import {
+  Schema,
+  type CurrentPageService,
+  type IWikiPage,
+  type InPageEdit,
+  type PreferencesService,
+  type WikiPageService,
+} from '@inpageedit/core'
 
 import { defineIPEPlugin } from '~~/defineIPEPlugin.js'
 import {
@@ -15,20 +22,27 @@ import {
 const PLUGIN_NAME = 'quick-cat'
 const APPLIED_FLAG = Symbol.for('ipe-quick-cat.applied')
 
+// Route logging through the framework logger (ctx.logger) once available,
+// falling back to console in standalone/test contexts
+let _logger: {
+  info: (...args: unknown[]) => void
+  warn: (...args: unknown[]) => void
+  error: (...args: unknown[]) => void
+} | null = null
 const log = {
-  info: (...args: unknown[]) => console.info('[IPE-QuickCat]', ...args),
-  warn: (...args: unknown[]) => console.warn('[IPE-QuickCat]', ...args),
-  error: (...args: unknown[]) => console.error('[IPE-QuickCat]', ...args),
+  info: (...args: unknown[]) => (_logger ? _logger.info(...args) : console.info('[IPE-QuickCat]', ...args)),
+  warn: (...args: unknown[]) => (_logger ? _logger.warn(...args) : console.warn('[IPE-QuickCat]', ...args)),
+  error: (...args: unknown[]) => (_logger ? _logger.error(...args) : console.error('[IPE-QuickCat]', ...args)),
 }
 
 type Ctx = InPageEdit & {
   $$: (strings: TemplateStringsArray, ...args: unknown[]) => string
-  api: any
-  currentPage?: any
-  modal: any
-  wikiPage: any
-  preferences: any
-  [k: string]: any
+  api: any // MwApi instance (wiki-saikou); no stable re-export from core
+  currentPage?: CurrentPageService
+  modal: any // ModalService; the modal instance API is chained (createObject().init())
+  wikiPage: WikiPageService
+  preferences: PreferencesService
+  toolbox: any
 }
 
 const I18N: Record<'zh' | 'en', Record<string, string>> = {
@@ -114,6 +128,8 @@ const OFFICIAL_KEYS: Record<string, string> = {
 }
 
 let currentCtx: Ctx | null = null
+let suggestSeq = 0
+let optSeq = 0
 
 // Lightweight i18n: reuse the official dict when possible, else built-in zh/en
 function i18n(key: string, ...args: (string | number)[]): string {
@@ -188,11 +204,12 @@ const TAG_ICON_SVG = `
     <path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3" />
   </svg>
 `
-function createTagIcon(): HTMLElement {
+function createSvgIcon(svg: string): HTMLElement {
   const wrapper = document.createElement('div')
-  wrapper.innerHTML = TAG_ICON_SVG.trim()
+  wrapper.innerHTML = svg.trim()
   return wrapper.firstElementChild as HTMLElement
 }
+const createTagIcon = () => createSvgIcon(TAG_ICON_SVG)
 
 const INFO_ICON_SVG = `
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
@@ -204,11 +221,7 @@ const INFO_ICON_SVG = `
     <path d="M11 12h1v4h1" />
   </svg>
 `
-function createInfoIcon(): HTMLElement {
-  const wrapper = document.createElement('div')
-  wrapper.innerHTML = INFO_ICON_SVG.trim()
-  return wrapper.firstElementChild as HTMLElement
-}
+const createInfoIcon = () => createSvgIcon(INFO_ICON_SVG)
 
 let _defaultSortHelpCache: string | null = null
 
@@ -356,6 +369,8 @@ function attachAutocomplete(
   const hideSuggest = () => {
     suggest.remove()
     suggest.textContent = ''
+    input.setAttribute('aria-expanded', 'false')
+    input.removeAttribute('aria-activedescendant')
   }
   const positionSuggest = () => {
     if (!suggest.children.length) return
@@ -381,6 +396,68 @@ function attachAutocomplete(
 
   let timer: ReturnType<typeof setTimeout> | null = null
   let searchSeq = 0
+  let optionEls: HTMLButtonElement[] = []
+  let activeIndex = 0
+
+  // ARIA combobox wiring
+  input.setAttribute('role', 'combobox')
+  input.setAttribute('aria-autocomplete', 'list')
+  input.setAttribute('aria-expanded', 'false')
+  suggest.id = suggest.id || `ipe-quick-cat__suggest-${++suggestSeq}`
+  input.setAttribute('aria-controls', suggest.id)
+  suggest.setAttribute('role', 'listbox')
+
+  const setActive = (index: number) => {
+    if (!optionEls.length) return
+    activeIndex = (index + optionEls.length) % optionEls.length
+    optionEls.forEach((el, i) => {
+      const on = i === activeIndex
+      el.classList.toggle('is-active', on)
+      el.setAttribute('aria-selected', String(on))
+    })
+    input.setAttribute('aria-activedescendant', optionEls[activeIndex].id)
+    optionEls[activeIndex].scrollIntoView({ block: 'nearest' })
+  }
+
+  const render = (resultItems: CategorySuggestion[]) => {
+    suggest.textContent = ''
+    optionEls = []
+    if (!resultItems.length) return
+    for (const item of resultItems) {
+      const isRedirect = !!item.redirect
+      const btn = h(
+        'button',
+        {
+          id: `ipe-quick-cat__opt-${++optSeq}`,
+          class: isRedirect
+            ? 'ipe-quick-cat__suggest-item is-redirect'
+            : 'ipe-quick-cat__suggest-item',
+          type: 'button',
+          role: 'option',
+          'aria-selected': 'false',
+          title: isRedirect ? item.redirect : undefined,
+          onClick: () => {
+            // Pick the redirect target so the real category is saved
+            const value = isRedirect ? (item.redirect ?? item.name) : item.name
+            if (handlers.onPick) handlers.onPick(value)
+            else input.value = value
+            hideSuggest()
+            input.focus()
+          },
+        },
+        item.name
+      ) as HTMLButtonElement
+      if (isRedirect) {
+        btn.append(h('span', { class: 'ipe-quick-cat__suggest-redirect' }, `→ ${item.redirect}`))
+      }
+      optionEls.push(btn)
+      suggest.append(btn)
+    }
+    input.setAttribute('aria-expanded', 'true')
+    setActive(0)
+    positionSuggest()
+  }
+
   input.addEventListener('input', () => {
     if (timer) clearTimeout(timer)
     const q = stripCategoryPrefix(input.value)
@@ -393,45 +470,22 @@ function attachAutocomplete(
       searchCategories(ctx, q)
         .then((items) => {
           if (m.isDestroyed || seq !== searchSeq) return
-          suggest.textContent = ''
-          if (!items.length) return
-          for (const item of items) {
-            const isRedirect = !!item.redirect
-            const btn = h(
-              'button',
-              {
-                class: isRedirect
-                  ? 'ipe-quick-cat__suggest-item is-redirect'
-                  : 'ipe-quick-cat__suggest-item',
-                type: 'button',
-                title: isRedirect ? item.redirect : undefined,
-                onClick: () => {
-                  // Pick the redirect target so the real category is saved
-                  const value = isRedirect ? (item.redirect ?? item.name) : item.name
-                  if (handlers.onPick) handlers.onPick(value)
-                  else input.value = value
-                  hideSuggest()
-                  input.focus()
-                },
-              },
-              item.name
-            )
-            if (isRedirect) {
-              btn.append(
-                h('span', { class: 'ipe-quick-cat__suggest-redirect' }, `→ ${item.redirect}`)
-              )
-            }
-            suggest.append(btn)
-          }
-          positionSuggest()
+          render(items)
         })
         .catch(() => hideSuggest())
     }, 200)
   })
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (handlers.onEnter) handlers.onEnter()
+      if (optionEls.length) setActive(activeIndex + 1)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (optionEls.length) setActive(activeIndex - 1)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (optionEls.length) optionEls[activeIndex]?.click()
+      else if (handlers.onEnter) handlers.onEnter()
     } else if (e.key === 'Escape') {
       hideSuggest()
       input.blur()
@@ -454,7 +508,7 @@ function attachAutocomplete(
 interface CategoryState {
   title: string
   pageName: string
-  page: any
+  page: IWikiPage
   content: string
   categories: CategoryRef[]
   originalDefaultSort: string
@@ -846,9 +900,14 @@ async function showModal(ctx: Ctx): Promise<any> {
     return
   }
 
-  const defaultSummary = (await ctx.preferences.get('quickCat.defaultSummary')) || ''
-  const defaultMinor = !!(await ctx.preferences.get('quickCat.defaultMinor'))
-  const outSideClose = !!(await ctx.preferences.get('quickCat.outSideClose'))
+  const [summaryVal, minorVal, closeVal] = await Promise.all([
+    ctx.preferences.get('quickCat.defaultSummary'),
+    ctx.preferences.get('quickCat.defaultMinor'),
+    ctx.preferences.get('quickCat.outSideClose'),
+  ])
+  const defaultSummary = String(summaryVal ?? '')
+  const defaultMinor = !!minorVal
+  const outSideClose = !!closeVal
 
   const m = modal
     .createObject({
@@ -943,6 +1002,7 @@ export default defineIPEPlugin({
     // Prevent duplicate registration (plugin store + userscript both load)
     if ((c as any)[APPLIED_FLAG]) return
     ;(c as any)[APPLIED_FLAG] = true
+    _logger = (c as any).logger?.('quick-cat') ?? null
 
     // Preferences UI via the custom config registry (reliable for store-installed plugins)
     c.preferences?.registerCustomConfig?.(
@@ -968,7 +1028,9 @@ export default defineIPEPlugin({
 
     let action = 'view'
     try {
-      action = c.currentPage?.wikiAction || (mw.config.get('wgAction') as string) || 'view'
+      const pageAction = c.currentPage?.wikiAction
+      action =
+        (typeof pageAction === 'string' && pageAction) || (mw.config.get('wgAction') as string) || 'view'
     } catch {
       /* ignore */
     }
@@ -985,7 +1047,7 @@ export default defineIPEPlugin({
       buttonProps: canEdit
         ? undefined
         : { style: { cursor: 'not-allowed', filter: 'grayscale(50%) opacity(.75)' } },
-      onClick: (e) => {
+      onClick: (e: Event) => {
         e.preventDefault()
         if (!canEdit) return
         void showModal(c)

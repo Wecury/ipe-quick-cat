@@ -233,7 +233,7 @@ export function renderLink(
 export function buildAppend(original: string, rows: CategoryRow[], defaultSort: string): string {
   let text = stripDefaultSort(original)
   text = stripCategoryLinks(text)
-  text = text.replace(/\n{3,}/g, '\n\n').trim()
+  text = text.replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/[ \t\r\n]+$/, '')
 
   const defaultNs = getCategoryNamespaceName()
   const lines: string[] = []
@@ -294,7 +294,7 @@ export function buildInPlace(
   for (const e of edits) {
     text = text.slice(0, e.start) + e.text + text.slice(e.end)
   }
-  text = text.replace(/\n{3,}/g, '\n\n').trim()
+  text = text.replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/[ \t\r\n]+$/, '')
 
   // Insert new categories (and DEFAULTSORT if absent) right after the last
   // category link (HotCat behavior), so they stay with the existing categories

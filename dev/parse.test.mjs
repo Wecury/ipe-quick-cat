@@ -143,6 +143,12 @@ assertEq('DEFAULTSORT 原位更新', out, 'X\n{{DEFAULTSORT:E}}\n[[分类:Foo]]\
 out = buildWikitext(CONTENT2, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS2)
 assertEq('清空默认排序键(无冗余显式键)', out, 'X\n\n[[分类:Foo]]\n')
 
+// 前导空格（preformatted 语义）在重排/更新时保留，不 trim 掉
+const CONTENT_PF = '  preformatted\n[[分类:Foo]]\n'
+const CATS_PF = parseCategories(CONTENT_PF).categories
+out = buildWikitext(CONTENT_PF, [{ _id: 1, name: 'Foo', sortkey: '', ns: '分类' }], '', CATS_PF)
+assertEq('保留preformatted前导空格', out, '  preformatted\n[[分类:Foo]]\n')
+
 // ============ 生成：拖动重排 -> 整体重建末尾 ============
 const CONTENT3 = 'A\n[[Category:Bar|b]]\n[[分类:Foo]]\n'
 const CATS3 = parseCategories(CONTENT3).categories // _id1=Bar, _id2=Foo
