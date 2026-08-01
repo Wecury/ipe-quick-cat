@@ -362,7 +362,7 @@ function attachAutocomplete(
   input: HTMLInputElement,
   suggest: HTMLElement,
   handlers: AutocompleteHandlers = {}
-): { hideSuggest: () => void } {
+): void {
   // Render as a fixed portal on body so the scrollable list can't clip it
   const hideSuggest = () => {
     suggest.remove()
@@ -460,7 +460,6 @@ function attachAutocomplete(
     suggest.remove()
     document.removeEventListener('click', onDocClick)
   })
-  return { hideSuggest }
 }
 
 interface CategoryState {
@@ -765,6 +764,7 @@ function renderDialog(ctx: Ctx, m: any, state: CategoryState): void {
   )
 
   const summaryInput = h('input', {
+    id: 'ipe-quick-cat__summary',
     class: 'ipe-quick-cat__summary-input',
     type: 'text',
     value: state.summary || '',
