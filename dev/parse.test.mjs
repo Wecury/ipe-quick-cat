@@ -116,6 +116,17 @@ out = buildWikitext(
 )
 assertEq('删除分类(整行删除不留空行)', out, '[[分类:1]]\n[[分类:3]]\n')
 
+// 删除分类时不折叠正文中与分类无关的多空行（修复激进规范化）
+const CONTENT_SP = 'Lead.\n\n\n\n[[分类:1]]\n[[分类:2]]\n'
+const CATS_SP = parseCategories(CONTENT_SP).categories // 1,2
+out = buildWikitext(
+  CONTENT_SP,
+  [{ _id: 1, name: '1', sortkey: '', ns: '分类' }],
+  '',
+  CATS_SP
+)
+assertEq('删除分类保留正文多空行', out, 'Lead.\n\n\n\n[[分类:1]]\n')
+
 // 新增分类 -> 追加到末尾，已有分类位置不变
 out = buildWikitext(
   CONTENT,
