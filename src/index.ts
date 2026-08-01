@@ -957,9 +957,7 @@ export default defineIPEPlugin({
     if ((c as any)[APPLIED_FLAG]) return
     ;(c as any)[APPLIED_FLAG] = true
 
-    // Register a Preferences UI section (default edit summary) through the custom
-    // config registry — the reliable path for store-installed plugins (same as
-    // official plugin-store / analytics / i18n do via ctx.preferences.registerCustomConfig).
+    // Preferences UI via the custom config registry (reliable for store-installed plugins)
     c.preferences?.registerCustomConfig?.(
       PLUGIN_NAME,
       Schema.object({
@@ -975,8 +973,7 @@ export default defineIPEPlugin({
       }).description('Quick Cat options'),
       'general'
     )
-    // customRegistries is public: move our section above the built-in 'language' one
-    // so it shows higher up in the General tab.
+    // Move our section above the built-in 'language' one in the General tab
     {
       const regs = c.preferences?.customRegistries as { name: string }[] | undefined
       if (regs) {

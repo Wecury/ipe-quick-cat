@@ -200,7 +200,7 @@ export function buildInPlace(
   const dsMatches = findDefaultSortMatches(text)
   for (let i = dsMatches.length - 1; i >= 0; i--) {
     const m = dsMatches[i]
-    const fullEnd = m.end + 2 // 越过结尾 }}
+    const fullEnd = m.end + 2 // skip the closing }}
     text =
       text.slice(0, m.start) + (defaultSort ? `{{DEFAULTSORT:${defaultSort}}}` : '') + text.slice(fullEnd)
   }
