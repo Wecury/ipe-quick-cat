@@ -1,6 +1,6 @@
 import './style.scss'
 
-import type { InPageEdit } from '@inpageedit/core'
+import { Schema, type InPageEdit } from '@inpageedit/core'
 
 import { defineIPEPlugin } from '~~/defineIPEPlugin.js'
 import {
@@ -913,7 +913,7 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
       categories: parsed.categories,
       originalDefaultSort: parsed.defaultSort,
       defaultSort: parsed.defaultSort,
-      summary: config?.summary || '',
+      summary: config?.summary || (await ctx.preferences.get('quickCat.defaultSummary')) || '',
       minor: false,
       reloadAfterSave: true,
       selected: new Set(),
@@ -947,6 +947,11 @@ async function showModal(ctx: Ctx, config: any): Promise<any> {
 export default defineIPEPlugin({
   name: PLUGIN_NAME,
   inject: ['toolbox', 'modal', 'wikiPage', 'api'],
+  PreferencesSchema: Schema.object({
+    'quickCat.defaultSummary': Schema.string()
+      .description('Default summary of the quick cat')
+      .default('[IPE-NEXT] Quick Cat'),
+  }).description('Quick Cat options'),
   apply(ctx: InPageEdit, config?: any): void {
     const c = ctx as Ctx
     // Prevent duplicate registration (plugin store + userscript both load)
