@@ -928,7 +928,8 @@ async function saveCategories(ctx: Ctx, m: any, state: CategoryState | null): Pr
 async function showModal(ctx: Ctx, config: any): Promise<any> {
   const { modal } = ctx
   const title =
-    ctx.currentPage?.wikiTitle?.toString?.() || (window.mw?.config?.get('wgPageName') as string) || ''
+    ctx.currentPage?.wikiTitle?.getPrefixedText?.() ||
+    ((window.mw?.config?.get('wgPageName') as string) || '').replace(/_/g, ' ')
   if (!title) {
     modal.notify('warning', { title: i18n('modalTitle'), content: i18n('notEditable') })
     return
