@@ -168,8 +168,21 @@ export function buildAppend(original: string, rows: CategoryRow[], defaultSort: 
   return `${text}\n${lines.join('\n')}\n`
 }
 
+// End offset of the last category link (HotCat-style insertion point); -1 if none
+function findLastCategoryEnd(text: string): number {
+  const alt = getCategoryNamespaceAlt()
+  const re = new RegExp(
+    `\\[\\[\\s*(?:${alt})\\s*:\\s*[^\\[\\]|]*?(?:\\s*\\|\\s*[^\\[\\]]*?)?\\s*\\]\\]`,
+    'gi'
+  )
+  let end = -1
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text))) end = m.index + m[0].length
+  return end
+}
+
 // In-place update (HotCat style): existing categories keep their positions,
-// DEFAULTSORT is replaced in place, new categories are appended at the end
+// DEFAULTSORT is replaced in place, new categories follow the last category link
 export function buildInPlace(
   original: string,
   rows: CategoryRow[],
@@ -201,7 +214,9 @@ export function buildInPlace(
   }
   text = text.replace(/\n{3,}/g, '\n\n').trim()
 
-  // Append new categories (and DEFAULTSORT if absent) at the end
+  // Insert new categories (and DEFAULTSORT if absent) right after the last
+  // category link (HotCat behavior), so they stay with the existing categories
+  // instead of landing at the bottom of the page.
   const newLines: string[] = []
   if (defaultSort && !dsMatches.length) newLines.push(`{{DEFAULTSORT:${defaultSort}}}`)
   for (const r of additions) {
@@ -209,6 +224,14 @@ export function buildInPlace(
     if (link) newLines.push(link)
   }
   if (newLines.length === 0) return `${text}\n`
+  const insertAt = findLastCategoryEnd(text)
+  if (insertAt >= 0) {
+    const suffix = text.slice(insertAt)
+    text = text.slice(0, insertAt) + '\n' + newLines.join('\n')
+    if (suffix.length && !suffix.startsWith('\n')) text += '\n'
+    text += suffix
+    return `${text}\n`
+  }
   return `${text}\n${newLines.join('\n')}\n`
 }
 

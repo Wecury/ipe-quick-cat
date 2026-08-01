@@ -105,6 +105,24 @@ out = buildWikitext(
 )
 assertEq('新增分类(追加末尾)', out, 'A\n[[分类:Foo]]\n[[Category:Bar|b]]\n[[分类:New]]\n')
 
+// 新增分类：分类不在末尾时，紧跟最后一个分类链接（HotCat 风格），而非页尾
+const CONTENT_MID = 'Lead paragraph.\n[[分类:Foo]]\nTail paragraph.\n'
+const CATS_MID = parseCategories(CONTENT_MID).categories
+out = buildWikitext(
+  CONTENT_MID,
+  [
+    { _id: 1, name: 'Foo', sortkey: '', ns: '分类' },
+    { name: 'New', sortkey: '', ns: null },
+  ],
+  '',
+  CATS_MID
+)
+assertEq(
+  '新增分类(紧跟已有分类, 不落页尾)',
+  out,
+  'Lead paragraph.\n[[分类:Foo]]\n[[分类:New]]\nTail paragraph.\n'
+)
+
 // DEFAULTSORT 原位更新
 const CONTENT2 = 'X\n{{DEFAULTSORT:D}}\n[[分类:Foo]]\n'
 const CATS2 = parseCategories(CONTENT2).categories
