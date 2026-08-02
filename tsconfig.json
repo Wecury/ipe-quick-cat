@@ -13,7 +13,9 @@
     "noEmit": true,
     "esModuleInterop": true,
     "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx-dom"
   },
   "include": ["src", "harness"]
 }

@@ -2,8 +2,6 @@
 // 运行：node --import tsx dev/parse.test.mjs
 import {
   buildWikitext,
-  getCategoryNamespaceAlt,
-  getCategoryNamespaceName,
   initCategoryNsInfo,
   isUnchanged,
   parseCategories,
@@ -44,8 +42,8 @@ function assertEq(label, actual, expected) {
 }
 
 // ---- 基础 ----
-assertEq('本地化前缀集合', getCategoryNamespaceAlt(), 'Category|category|Cat|分类|分類')
-assertEq('站点规范命名空间名', getCategoryNamespaceName(), '分类')
+assertEq('本地化前缀集合', initCategoryNsInfo().alt, 'Category|category|Cat|分类|分類')
+assertEq('站点规范命名空间名', initCategoryNsInfo().name, '分类')
 
 // ---- 解析（含位置 _id/start/end）----
 let parsed = parseCategories('Hello\n[[Category:Foo]]\n[[分类:中文类]]\n[[分類:繁中|排序]]\n[[:分类:仅展示]]\n', NS)

@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   build: {
     lib: {
-      entry: 'src/index.ts',
+      entry: 'src/index.tsx',
       formats: ['es'],
       fileName: () => 'index.mjs',
       cssFileName: 'style',
@@ -18,8 +18,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // 与官方注册表 packages/*/vite.config.ts 一致（注册表指向 ../../common，
-      // 独立版本地用 harness/ 承载 defineIPEPlugin.ts 与 Promise.withResolvers.ts）
+      // Alias '~~' to harness/ (the registry build points it at ../../common)
       '~~': resolve(import.meta.dirname, 'harness'),
     },
   },
