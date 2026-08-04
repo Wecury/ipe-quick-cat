@@ -2,7 +2,18 @@
   "$schema": "https://registry.ipe.wiki/registry.v1.schema.json",
   "manifest_version": 1,
   "name": "Wecury Plugins",
+  "homepage": "https://github.com/Wecury/ipe-quick-cat",
   "base_url": "./",
+  "last_modified": "2026-08-04T00:00:00.000Z",
+  "maintainers": [
+    {
+      "name": "Wecury"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wecury/ipe-quick-cat.git"
+  },
   "packages": [
     {
       "id": "quick-cat",
