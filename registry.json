@@ -19,7 +19,7 @@
       "id": "quick-cat",
       "name": "Quick Cat",
       "version": "1.0.0",
-      "description": "Edit page categories in a dialog similar to VisualEditor, including sort keys and the default sort key, with autocomplete and drag-to-reorder.",
+      "description": "Edit page categories: add, remove, rename, sort keys, default sort, autocomplete and drag-to-reorder.",
       "author": "Wecury",
       "license": "MIT",
       "categories": ["editor", "utility"],
